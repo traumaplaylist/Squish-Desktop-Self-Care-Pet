@@ -1,6 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { basename, join } from 'node:path';
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, powerMonitor, screen } from 'electron';
+import { readFileSync, writeFileSync } from 'node:fs';
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  powerMonitor,
+  screen,
+} from 'electron';
+import { applyImport, buildExport, parseExport } from './dataTransfer';
 import { AcceleratedClock, type Clock } from '../core/clock';
 import { formatTimeOfDay, nextDayBoundary } from '../core/day';
 import { dayKey } from '../core/day';
@@ -14,7 +25,7 @@ import { Engine } from './engine';
 import { getDict, setLang, t } from './i18n';
 import { validateSettings } from '../core/settingsSchema';
 import { closePage, openPage, retitlePages } from './windows/pages';
-import { log } from './log';
+import { initFileLog, log } from './log';
 import { RealClock } from './realClock';
 import { getKoffiError, loadKoffi, queryUserNotificationState } from './smartPause/fullscreen';
 import { dailyBackup, EventLog, JsonStore } from './storage';
@@ -75,6 +86,17 @@ async function main(): Promise<void> {
   const accel = DEBUG ? new AcceleratedClock(real, DEBUG_SPEED) : null;
   const clock: Clock = accel ?? real;
   const dataDir = app.getPath('userData');
+  initFileLog(join(dataDir, 'logs'));
+  // Устойчивость (День 7): необработанная ошибка — в лог, приложение живёт дальше.
+  process.on('uncaughtException', (e) => log('uncaughtException:', e));
+  process.on('unhandledRejection', (e) => log('unhandledRejection:', e));
+  app.on('render-process-gone', (_e, wc, details) => {
+    log(`окно упало (${details.reason}, код ${details.exitCode}) — перезагружаю`);
+    if (!wc.isDestroyed()) wc.reload();
+  });
+  app.on('child-process-gone', (_e, details) =>
+    log(`процесс ${details.type} завершился: ${details.reason}`),
+  );
 
   const settingsStore = new JsonStore<Settings>({
     dir: dataDir,
@@ -183,10 +205,13 @@ async function main(): Promise<void> {
           break;
         case 'showOverlay':
           overlay.show();
+          // Во время перерыва виджет под оверлеем — его анимации на паузе (SPEC 7.5).
+          widget.win.webContents.send('pet:paused', true);
           break;
         case 'hideOverlay':
           // Досидел — сначала радость, потом окно тает (обрабатывается ниже).
           if (!(finished?.type === 'breakFinished' && finished.completed)) overlay.hide();
+          if (widget.win.isVisible()) widget.win.webContents.send('pet:paused', false);
           break;
         case 'petReaction':
           widget.win.webContents.send('pet:play', e.reaction);
@@ -200,6 +225,7 @@ async function main(): Promise<void> {
         case 'breakFinished':
           if (e.completed) {
             overlay.finish();
+            widget.win.webContents.send('pet:paused', false);
             widget.win.webContents.send('pet:play', 'celebrate');
           }
           break;
@@ -288,6 +314,8 @@ async function main(): Promise<void> {
 
   // Для e2e-тестов (только чтение).
   (globalThis as Record<string, unknown>)['__squishPhase'] = () => engine.getSchedulerState().phase;
+  // Для замеров CPU/RAM на Windows в CI (только чтение).
+  (globalThis as Record<string, unknown>)['__squishMetrics'] = () => app.getAppMetrics();
 
   const publish = () => {
     const snap = engine.snapshot();
@@ -508,6 +536,52 @@ async function main(): Promise<void> {
     else if (w === 'tasks') tasksWin.show('panel');
   });
   on('settings:update', (patch) => updateSettings(patch));
+  handle('data:export', async () => {
+    // Сначала дописать всё на диск, чтобы экспорт был свежим.
+    engine.persistNow();
+    stateStore.flush();
+    tasksStore.flush();
+    settingsStore.flush();
+    const r = await dialog.showSaveDialog({
+      defaultPath: join(app.getPath('documents'), `squish-${dayKey(clock.now())}.squish.json`),
+      filters: [{ name: 'Squish', extensions: ['json'] }],
+    });
+    if (r.canceled || !r.filePath) return { ok: false, reason: 'cancelled' };
+    try {
+      writeFileSync(
+        r.filePath,
+        JSON.stringify(buildExport(dataDir, VERSION, new Date()), null, 1),
+        'utf8',
+      );
+      log(`экспорт данных: ${r.filePath}`);
+      return { ok: true, path: r.filePath };
+    } catch (e) {
+      log('экспорт не удался:', e);
+      return { ok: false, reason: 'write-failed' };
+    }
+  });
+  handle('data:import', async () => {
+    const r = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Squish', extensions: ['json'] }],
+    });
+    const file = r.filePaths[0];
+    if (r.canceled || !file) return { ok: false, reason: 'cancelled' };
+    let text: string;
+    try {
+      text = readFileSync(file, 'utf8');
+    } catch {
+      return { ok: false, reason: 'read-failed' };
+    }
+    const p = parseExport(text);
+    if (!p.ok) return { ok: false, reason: p.reason };
+    const safe = applyImport(dataDir, p.bundle, new Date().toISOString().replace(/[:.]/g, '-'));
+    log(`импорт данных из ${file}; прежние данные сохранены в ${safe} → перезапуск`);
+    quitting = true;
+    app.relaunch();
+    app.exit(0);
+    return { ok: true, path: file };
+  });
   on('settings:resetProgress', () => {
     // Прогресс — питомец, экономика, задачи. Настройки и позиция виджета остаются.
     const keep = stateStore.get();

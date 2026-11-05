@@ -321,5 +321,21 @@
   "onboarding.next": "Next",
   "onboarding.back": "Back",
   "onboarding.skip": "Skip",
-  "onboarding.done": "Done"
+  "onboarding.done": "Done",
+  "settings.data": "Data",
+  "settings.dataHint": "save everything to one file or move to another computer",
+  "settings.export": "Export…",
+  "settings.import": "Import…",
+  "settings.importSure": "Replace current data? (old data goes to a backup)",
+  "settings.exported": "Saved: {path}",
+  "data.err.not-json": "This is not a Squish file",
+  "data.err.not-squish": "This is not a Squish file",
+  "data.err.newer-version": "The file is from a newer Squish",
+  "data.err.no-data": "The file has no data",
+  "data.err.bad-settings": "The file is damaged (settings)",
+  "data.err.bad-state": "The file is damaged (pet)",
+  "data.err.bad-tasks": "The file is damaged (tasks)",
+  "data.err.bad-events": "The file is damaged (history)",
+  "data.err.read-failed": "Could not read the file",
+  "data.err.write-failed": "Could not save the file"
 }

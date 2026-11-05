@@ -14,6 +14,8 @@ export function SettingsPage() {
   const [version, setVersion] = useState('');
   const [resetStep, setResetStep] = useState(0);
   const [newExe, setNewExe] = useState('');
+  const [dataMsg, setDataMsg] = useState('');
+  const [importStep, setImportStep] = useState(0);
 
   useEffect(() => {
     void window.squish.invoke('settings:get').then((r) => {
@@ -352,6 +354,55 @@ export function SettingsPage() {
             />
           </Field>
         ))}
+      </div>
+
+      <h2>{t('settings.data')}</h2>
+      <div className="card">
+        <div className="field">
+          <span className="muted">{t('settings.dataHint')}</span>
+          <span>
+            <button
+              className="btn"
+              onClick={() =>
+                void window.squish
+                  .invoke('data:export')
+                  .then((r) =>
+                    setDataMsg(
+                      r.ok
+                        ? t('settings.exported', { path: r.path ?? '' })
+                        : r.reason === 'cancelled'
+                          ? ''
+                          : t(`data.err.${r.reason}`),
+                    ),
+                  )
+              }
+            >
+              {t('settings.export')}
+            </button>{' '}
+            {importStep === 0 ? (
+              <button className="btn" onClick={() => setImportStep(1)}>
+                {t('settings.import')}
+              </button>
+            ) : (
+              <button
+                className="btn danger"
+                onClick={() => {
+                  setImportStep(0);
+                  void window.squish.invoke('data:import').then((r) => {
+                    if (!r.ok && r.reason !== 'cancelled') setDataMsg(t(`data.err.${r.reason}`));
+                  });
+                }}
+              >
+                {t('settings.importSure')}
+              </button>
+            )}
+          </span>
+        </div>
+        {dataMsg && (
+          <div className="hint muted" style={{ marginTop: 6 }}>
+            {dataMsg}
+          </div>
+        )}
       </div>
 
       <h2>{t('settings.reset')}</h2>

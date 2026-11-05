@@ -53,6 +53,26 @@ jobs:
         run: node scripts/e2e-pet.mjs
       - name: E2E onboarding, settings (live), pet's home
         run: node scripts/e2e-onboarding.mjs
+      - name: Idle CPU / RAM on Windows (packaged app)
+        run: node scripts/measure-idle.mjs
+        env:
+          SQUISH_EXE: dist/win-unpacked/Squish.exe
+      - name: Install → run → uninstall (silent)
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem dist/Squish-Setup-*.exe | Select-Object -First 1
+          Start-Process -FilePath $setup.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'Programs\Squish\Squish.exe'
+          if (-not (Test-Path $exe)) { throw "не установился: $exe" }
+          Write-Host "установлен: $exe"
+          $env:SQUISH_EXE = $exe
+          node scripts/smoke.mjs
+          if ($LASTEXITCODE -ne 0) { throw 'смоук установленного приложения упал' }
+          $un = Join-Path $env:LOCALAPPDATA 'Programs\Squish\Uninstall Squish.exe'
+          Start-Process -FilePath $un -ArgumentList '/S' -Wait
+          Start-Sleep -Seconds 5
+          if (Test-Path $exe) { throw 'не удалился' }
+          Write-Host 'удалён'
       - name: Upload installer
         uses: actions/upload-artifact@v5
         with:

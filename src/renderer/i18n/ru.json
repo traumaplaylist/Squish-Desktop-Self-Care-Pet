@@ -321,5 +321,21 @@
   "onboarding.next": "Дальше",
   "onboarding.back": "Назад",
   "onboarding.skip": "Пропустить",
-  "onboarding.done": "Готово"
+  "onboarding.done": "Готово",
+  "settings.data": "Данные",
+  "settings.dataHint": "сохранить всё в один файл или перенести на другой компьютер",
+  "settings.export": "Экспорт…",
+  "settings.import": "Импорт…",
+  "settings.importSure": "Заменить текущие данные? (старые сохранятся в бэкап)",
+  "settings.exported": "Сохранено: {path}",
+  "data.err.not-json": "Это не файл Squish",
+  "data.err.not-squish": "Это не файл Squish",
+  "data.err.newer-version": "Файл из более новой версии Squish",
+  "data.err.no-data": "В файле нет данных",
+  "data.err.bad-settings": "Файл повреждён (настройки)",
+  "data.err.bad-state": "Файл повреждён (питомец)",
+  "data.err.bad-tasks": "Файл повреждён (задачи)",
+  "data.err.bad-events": "Файл повреждён (история)",
+  "data.err.read-failed": "Не получилось прочитать файл",
+  "data.err.write-failed": "Не получилось сохранить файл"
 }

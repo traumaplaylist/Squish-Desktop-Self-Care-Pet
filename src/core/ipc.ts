@@ -120,6 +120,9 @@ export interface RendererInvokes {
     args: null;
     result: { settings: Settings; hotkeysFailed: string[]; version: string };
   };
+  /** Экспорт/импорт данных (P1): системный диалог в main. reason — ключ ошибки. */
+  'data:export': { args: null; result: { ok: boolean; path?: string; reason?: string } };
+  'data:import': { args: null; result: { ok: boolean; path?: string; reason?: string } };
 }
 
 /*
@@ -172,6 +175,8 @@ const INVOKES: Record<keyof RendererInvokes, true> = {
   'tasks:get': true,
   'home:get': true,
   'settings:get': true,
+  'data:export': true,
+  'data:import': true,
 };
 const EVENTS: Record<keyof MainEvents, true> = {
   snapshot: true,

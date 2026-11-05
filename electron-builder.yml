@@ -10,6 +10,7 @@ files:
   - resources/**
   - package.json
   - '!**/*.map'
+  - '!resources/installer.nsh'
 # koffi 3: нативный код лежит в @koromix/koffi-<платформа>; .node из asar не грузится.
 asarUnpack:
   - '**/*.node'
@@ -31,6 +32,8 @@ nsis:
   shortcutName: Squish
   uninstallDisplayName: Squish
   deleteAppDataOnUninstall: false
+  # Вопрос «удалить данные?» при удалении — resources/installer.nsh
+  include: resources/installer.nsh
   artifactName: Squish-Setup-${version}.exe
 linux:
   # Только для локальной проверки упаковки в облачном Linux; релизов под Linux нет.
