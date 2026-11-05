@@ -25,7 +25,8 @@
     "icons": "node scripts/make-icons.mjs",
     "measure:idle": "node scripts/measure-idle.mjs",
     "build:dir": "electron-vite build && electron-builder --linux dir --publish never",
-    "i18n:check": "vitest run src/core/i18n.test.ts src/core/lines.test.ts src/core/exercises.test.ts"
+    "i18n:check": "vitest run src/core/i18n.test.ts src/core/lines.test.ts src/core/exercises.test.ts",
+    "test:coverage": "vitest run --coverage --coverage.include=src/core/**/*.ts --coverage.exclude=src/core/**/*.test.ts --coverage.reporter=text-summary --coverage.thresholds.lines=80"
   },
   "dependencies": {
     "koffi": "^3.3.7"
@@ -36,6 +37,7 @@
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^6.2.1",
+    "@vitest/coverage-v8": "^5.1.0",
     "cross-env": "^10.1.0",
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0",
