@@ -115,6 +115,28 @@ try {
   );
   await until(async () => (await phase()) === 'preBreak', 'должный перерыв после кулдауна', 20_000);
   check(true, 'после созвона и кулдауна — снова preBreak');
+
+  // День 3: вода — 💧 при наведении → облачко с «Отменить» → отмена
+  await dbg.getByRole('button', { name: 'Снять' }).click();
+  await dbg.getByRole('button', { name: '×1', exact: true }).click();
+  await widget.locator('.bubble').getByRole('button', { name: 'Пропустить' }).click();
+  await until(async () => (await phase()) === 'working', 'пропуск preBreak', 5_000);
+  await widget.mouse.move(120, 225);
+  await widget.waitForTimeout(300);
+  await widget.locator('.hover-buttons.visible button').first().click();
+  await widget.waitForTimeout(300);
+  check(
+    (await widget.locator('.bubble').textContent())?.includes('1 из 8') ?? false,
+    'вода: «Глоток! 1 из 8»',
+  );
+  check((await widget.locator('.glass').count()) === 1, 'вода: питомец пьёт из стакана');
+  await widget.screenshot({ path: join(out, 'e2e-water.png') });
+  await widget.getByRole('button', { name: 'Отменить' }).click();
+  await widget.waitForTimeout(300);
+  check(
+    (await widget.locator('.bubble').textContent())?.includes('не считаем') ?? false,
+    'вода: отмена',
+  );
 } catch (e) {
   check(false, e instanceof Error ? e.message : String(e));
 } finally {

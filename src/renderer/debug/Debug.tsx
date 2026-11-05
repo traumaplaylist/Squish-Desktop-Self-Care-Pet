@@ -36,6 +36,8 @@ const SPEEDS = [1, 10, 60, 600];
 const SUPPRESS: SuppressReason[] = ['mic', 'camera', 'fullscreen'];
 const LATER = ['debug.plusDay', 'debug.stageUp', 'debug.reset', 'debug.drink'];
 
+const fmtList = (v: string[] | 'unknown') =>
+  v === 'unknown' ? 'unknown' : v.length ? v.join(', ') : 'никто';
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 
 export function Debug() {
@@ -121,6 +123,20 @@ export function Debug() {
             {t('debug.breakLong')}
           </button>
         </div>
+      </section>
+      <section>
+        <h2>{t('debug.detectors')}</h2>
+        <pre>
+          {d?.detectors
+            ? [
+                `микрофон: ${fmtList(d.detectors.mic)}`,
+                `камера: ${fmtList(d.detectors.camera)}`,
+                `фуллскрин: ${d.detectors.fullscreen ?? 'нет'}`,
+                `передний план: ${d.detectors.foregroundExe ?? '—'}`,
+                `хоткеи заняты: ${snap?.hotkeysFailed.length ? snap.hotkeysFailed.join(', ') : 'нет'}`,
+              ].join('\n')
+            : '…'}
+        </pre>
       </section>
       <section>
         <h2>{t('debug.suppress')}</h2>

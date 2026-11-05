@@ -57,6 +57,13 @@ try {
     if (process.platform === 'win32' && typeof probe.notificationState !== 'number') {
       fail(`SHQueryUserNotificationState вернул ${probe.notificationState}`);
     }
+    if (process.platform === 'win32') {
+      // День 3: реестр микрофона через koffi читается и совпадает с reg.exe (R0).
+      if (probe.consent?.koffi === 'unknown') fail('ConsentStore через koffi вернул unknown');
+      if (probe.consent?.sameKeys === false)
+        fail(`koffi и reg.exe видят разные записи: ${JSON.stringify(probe.consent)}`);
+      if (probe.foreground === 'unknown') fail('окно переднего плана: unknown');
+    }
   }
 
   const info = await app.evaluate(({ BrowserWindow }) =>

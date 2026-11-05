@@ -4,6 +4,7 @@
  */
 import type {
   BreakKind,
+  BubbleAction,
   Palette,
   PetReaction,
   PetVisualState,
@@ -16,6 +17,10 @@ export interface ProbeResult {
   koffi: { loaded: boolean; version: string | null; error: string | null };
   /** Код SHQueryUserNotificationState или 'unknown' (не Windows / ошибка). */
   notificationState: number | 'unknown';
+  /** ConsentStore\microphone: число записей через koffi и через reg.exe; одинаковы ли ключи. */
+  consent: { koffi: number | 'unknown'; reg: number | 'unknown'; sameKeys: boolean | null };
+  /** exe окна на переднем плане (basename). */
+  foreground: string | null | 'unknown';
 }
 
 /** main → renderer */
@@ -44,6 +49,9 @@ export interface RendererCommands {
   'break:postpone': null;
   'break:skip': null;
   'break:now': BreakKind;
+  'water:drink': null;
+  'tasks:open': null;
+  'bubble:action': BubbleAction;
   'debug:setVisual': PetVisualState | null;
   'debug:setSpeed': number;
   /** Имитация простоя ввода (мс) или null — реальный простой. */
@@ -75,6 +83,9 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'break:postpone': true,
   'break:skip': true,
   'break:now': true,
+  'water:drink': true,
+  'tasks:open': true,
+  'bubble:action': true,
   'debug:setVisual': true,
   'debug:setSpeed': true,
   'debug:fakeIdle': true,

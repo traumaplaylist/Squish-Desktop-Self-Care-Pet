@@ -111,5 +111,20 @@
   "debug.input": "Input:",
   "debug.inputReal": "real",
   "debug.inputTyping": "typing",
-  "debug.inputAway": "away"
+  "debug.inputAway": "away",
+  "water.drank": "Sip! {n} of {goal}",
+  "water.drankOverGoal": "Another glass — {n}. Goal already reached",
+  "water.undo": "Undo",
+  "water.undone": "Okay, not counting it",
+  "water.reminder": "Maybe a sip of water?",
+  "water.drinkNow": "Done",
+  "water.button": "I drank water",
+  "tasks.button": "Tasks",
+  "tasks.soon": "Tasks are coming very soon",
+  "quiet.stillOnCall": "Still on a call in {app}?",
+  "quiet.yesCall": "Yes",
+  "quiet.notACall": "No, not a call",
+  "tray.notACall": "Don't treat {app} as a call",
+  "tray.tooltipQuietApp": "Quiet: {reason} — {app}",
+  "debug.detectors": "Detectors (real)"
 }

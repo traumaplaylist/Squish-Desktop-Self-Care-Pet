@@ -3,7 +3,8 @@
  * Electron сюда не импортируется — всё внешнее приходит через EngineDeps (так движок тестируется).
  */
 import type { Clock } from '../core/clock';
-import { isOffHours } from '../core/day';
+import { MINUTE } from '../core/clock';
+import { dayKey, isOffHours } from '../core/day';
 import type { AppEvent, Effect } from '../core/events';
 import {
   nextBreak,
@@ -16,6 +17,7 @@ import {
 } from '../core/scheduler';
 import type {
   BreakKind,
+  Bubble,
   PersistedState,
   PetVisualState,
   SchedulerState,
@@ -24,6 +26,7 @@ import type {
   SuppressReason,
 } from '../core/types';
 import { selectVisual } from '../core/visual';
+import { drink, undoDrink, waterForDay, waterTick, type WaterConfig } from '../core/water';
 
 export interface EngineDeps {
   clock: Clock;
@@ -37,21 +40,25 @@ export interface EngineDeps {
   getSettings: () => Settings;
   appendEvent: (e: AppEvent) => void;
   onEffects: (fx: Effect[]) => void;
+  /** Debug: последние показания детекторов. */
+  getDetectorReadings?: () => NonNullable<Snapshot['debugInfo']>['detectors'];
   debug: boolean;
 }
 
 const BUBBLE_DEFAULT_MS = 4000;
+const UNDO_BUBBLE_MS = 30_000;
+const REMINDER_BUBBLE_MS = 60_000;
+/** R0: созвон дольше 3 ч подряд — спросить, точно ли это созвон. */
+export const STILL_ON_CALL_MS = 3 * 60 * MINUTE;
 
 export class Engine {
   private sched: SchedulerState;
   private simSuppression: { reason: SuppressReason; until: number } | null = null;
   private detectorSuppression: { reason: SuppressReason; app: string | null } | null = null;
   private lockedSinceReal: number | null = null;
-  private bubble: {
-    textKey: string;
-    params?: Record<string, string | number>;
-    untilReal: number;
-  } | null = null;
+  private bubble: (Bubble & { untilReal: number }) | null = null;
+  private askedStillOnCallFor: number | null = null;
+  private hotkeysFailed: string[] = [];
   private visualOverride: PetVisualState | null = null;
   private lastIdleMs = 0;
   private fakeIdleMs: number | null = null;
@@ -81,12 +88,116 @@ export class Engine {
         : this.simSuppression
           ? { reason: this.simSuppression.reason, app: 'debug' }
           : this.detectorSuppression;
+    const before = this.sched;
     this.apply({
       type: 'tick',
       idleMs: idle,
       suppression,
       offHours: isOffHours(this.d.getSettings().smartPause.workHours, now),
     });
+    this.afterTick(before, now);
+  }
+
+  /** Вода и «всё ещё на созвоне?» — после шага планировщика. */
+  private afterTick(before: SchedulerState, now: number): void {
+    const after = this.sched;
+    // Активное время за tick = прирост длинного таймера (сброс после перерыва даёт 0 — это 1 с, не важно).
+    const activeDelta = Math.max(0, after.activeSinceLong - before.activeSinceLong);
+    const st = this.d.getState();
+    const water0 = waterForDay(st.water, dayKey(now));
+    const r = waterTick(
+      water0,
+      {
+        activeDeltaMs: activeDelta,
+        need: st.pet.needs.water,
+        now,
+        canRemind: after.phase === 'working',
+      },
+      this.waterCfg(),
+    );
+    if (r.water !== st.water) this.d.setState({ ...this.d.getState(), water: r.water }, 10_000);
+    if (r.remind && !this.bubble) {
+      this.setBubble(
+        {
+          textKey: 'water.reminder',
+          actions: [{ labelKey: 'water.drinkNow', action: 'water:drink' }],
+        },
+        REMINDER_BUBBLE_MS,
+      );
+    }
+    const sup = after.suppression;
+    if (
+      after.phase === 'suppressed' &&
+      sup &&
+      (sup.reason === 'mic' || sup.reason === 'camera') &&
+      now - sup.since >= STILL_ON_CALL_MS &&
+      this.askedStillOnCallFor !== sup.since
+    ) {
+      this.askedStillOnCallFor = sup.since;
+      this.setBubble(
+        {
+          textKey: 'quiet.stillOnCall',
+          params: { app: sup.app ?? '?' },
+          actions: [
+            { labelKey: 'quiet.yesCall', action: 'dismiss' },
+            { labelKey: 'quiet.notACall', action: 'quiet:ignoreApp' },
+          ],
+        },
+        10 * MINUTE,
+      );
+    }
+  }
+
+  private waterCfg(): WaterConfig {
+    const w = this.d.getSettings().water;
+    return { goalGlasses: w.goalGlasses, remindAfterMs: w.remindAfterMin * MINUTE };
+  }
+
+  /** Стакан воды (виджет, хоткей, трей): питомец пьёт, 30 с можно отменить. */
+  drinkWater(): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const r = drink(waterForDay(st.water, dayKey(now)), st.pet.needs.water, now, this.waterCfg());
+    this.d.setState(
+      { ...st, water: r.water, pet: { ...st.pet, needs: { ...st.pet.needs, water: r.need } } },
+      0,
+    );
+    r.events.forEach((e) => this.d.appendEvent(e));
+    this.setBubble(
+      {
+        textKey: r.overGoal ? 'water.drankOverGoal' : 'water.drank',
+        params: { n: r.water.glasses, goal: this.waterCfg().goalGlasses },
+        actions: [{ labelKey: 'water.undo', action: 'water:undo' }],
+      },
+      UNDO_BUBBLE_MS,
+    );
+    this.d.onEffects([{ type: 'petReaction', reaction: 'drink' }]);
+  }
+
+  undoWater(): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const r = undoDrink(st.water, st.pet.needs.water, now);
+    if (!r) return;
+    this.d.setState(
+      { ...st, water: r.water, pet: { ...st.pet, needs: { ...st.pet.needs, water: r.need } } },
+      0,
+    );
+    r.events.forEach((e) => this.d.appendEvent(e));
+    this.setBubble({ textKey: 'water.undone' }, 2500);
+    this.d.onEffects([]);
+  }
+
+  dismissBubble(): void {
+    this.bubble = null;
+  }
+
+  setHotkeysFailed(names: string[]): void {
+    this.hotkeysFailed = names;
+  }
+
+  private setBubble(b: Bubble, ttlMs: number): void {
+    this.bubble = { ...b, untilReal: this.d.realNow() + ttlMs };
   }
 
   dispatch(ev: Exclude<SchedulerEvent, { type: 'tick' }>): void {
@@ -128,7 +239,7 @@ export class Engine {
     params?: Record<string, string | number>,
     ttlMs = BUBBLE_DEFAULT_MS,
   ): void {
-    this.bubble = { textKey, untilReal: this.d.realNow() + ttlMs, ...(params ? { params } : {}) };
+    this.setBubble({ textKey, ...(params ? { params } : {}) }, ttlMs);
   }
 
   getSchedulerState(): SchedulerState {
@@ -167,13 +278,12 @@ export class Engine {
       tasksToday: { done: 0, total: 0 },
       scheduler: view,
       overlayOpacity: settings.breaks.overlayOpacity,
-      bubble: this.bubble
-        ? {
-            textKey: this.bubble.textKey,
-            ...(this.bubble.params ? { params: this.bubble.params } : {}),
-          }
-        : null,
-      hotkeysFailed: [],
+      bubble: this.bubble ? (({ untilReal: _u, ...b }) => b)(this.bubble) : null,
+      water: {
+        glasses: waterForDay(st.water, dayKey(now)).glasses,
+        goal: settings.water.goalGlasses,
+      },
+      hotkeysFailed: this.hotkeysFailed,
       debugInfo: this.d.debug
         ? {
             speed: this.d.timeScale(),
@@ -191,6 +301,7 @@ export class Engine {
                 }
               : null,
             fakeIdleMs: this.fakeIdleMs,
+            detectors: this.d.getDetectorReadings?.() ?? null,
           }
         : null,
     };

@@ -236,11 +236,21 @@ export interface DisplayInfo {
   primary: boolean;
 }
 
+/** Действия кнопок в облачке питомца. */
+export type BubbleAction = 'water:drink' | 'water:undo' | 'quiet:ignoreApp' | 'dismiss';
+
+export interface Bubble {
+  textKey: string;
+  params?: Record<string, string | number>;
+  actions?: { labelKey: string; action: BubbleAction }[];
+}
+
 /** Содержимое state.json. */
 export interface PersistedState {
   pet: PetState;
   economy: EconomyState;
   scheduler: SchedulerState;
+  water: import('./water').WaterState;
   widget: { position: WidgetPosition | null; visible: boolean };
   onboardingDone: boolean;
   lastDayClosed: DayKey | null;
@@ -268,7 +278,9 @@ export interface Snapshot {
   scheduler: import('./scheduler').SchedulerView;
   overlayOpacity: number;
   /** Реплика питомца в облачке (не связанная с перерывом). */
-  bubble: { textKey: string; params?: Record<string, string | number> } | null;
+  bubble: Bubble | null;
+  water: { glasses: number; goal: number };
+  /** Хоткеи, которые не удалось зарегистрировать (заняты другой программой). */
   hotkeysFailed: string[];
   /** Только в SQUISH_DEBUG. */
   debugInfo: {
@@ -280,5 +292,11 @@ export interface Snapshot {
     cooldownSec: number | null;
     simSuppression: { reason: SuppressReason; untilSec: number } | null;
     fakeIdleMs: number | null;
+    detectors: {
+      mic: string[] | 'unknown';
+      camera: string[] | 'unknown';
+      fullscreen: string | null;
+      foregroundExe: string | null;
+    } | null;
   } | null;
 }

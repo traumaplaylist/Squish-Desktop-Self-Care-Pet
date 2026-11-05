@@ -18,11 +18,16 @@ const DRAWN: ReadonlySet<PetVisualState> = new Set<PetVisualState>([
   'happy',
   'sleeping',
   'waving',
+  'quiet',
   'onBreak:lookFar',
   'onBreak:stretchUp',
   'onBreak:breathe',
 ]);
-const REACTION_MS: Partial<Record<PetReaction, number>> = { bounce: 650, celebrate: 1500 };
+const REACTION_MS: Partial<Record<PetReaction, number>> = {
+  bounce: 650,
+  celebrate: 1500,
+  drink: 1400,
+};
 
 interface BlobProps {
   state: PetVisualState;
@@ -34,6 +39,17 @@ interface BlobProps {
 }
 
 function Eyes({ state }: { state: PetVisualState }) {
+  if (state === 'quiet') {
+    // Тихо (умная пауза): спокойные полуприкрытые глаза — не мешает, но рядом.
+    return (
+      <g className="eyes quiet">
+        <ellipse cx={76} cy={116} rx={13} ry={7} fill="#2E2A3D" />
+        <ellipse cx={124} cy={116} rx={13} ry={7} fill="#2E2A3D" />
+        <ellipse cx={72} cy={114} rx={3} ry={2} fill="#fff" />
+        <ellipse cx={120} cy={114} rx={3} ry={2} fill="#fff" />
+      </g>
+    );
+  }
   if (state === 'sleeping') {
     return (
       <g className="eyes closed">
@@ -70,6 +86,7 @@ function Mouth({ state }: { state: PetVisualState }) {
   if (state === 'happy') return <path className="mouth-open" d="M90 136 Q100 150 110 136 Z" />;
   if (state === 'sleeping')
     return <ellipse className="mouth-sleep" cx={100} cy={140} rx={4} ry={3} />;
+  if (state === 'quiet') return <path className="mouth" d="M95 139 L105 139" />;
   return <path className="mouth" d="M93 137 Q100 143 107 137" />;
 }
 
@@ -121,6 +138,17 @@ function Blob(p: BlobProps) {
                   opacity={0.35}
                   transform="rotate(-20 72 70)"
                 />
+                {p.reaction?.name === 'drink' && (
+                  <g className="glass">
+                    <path
+                      d="M150 104 L176 104 L172 150 L154 150 Z"
+                      fill="#dff4ff"
+                      stroke="#9cc9e0"
+                      strokeWidth={2}
+                    />
+                    <path d="M152 118 L174 118 L172 150 L154 150 Z" fill="#7cc4ec" opacity={0.75} />
+                  </g>
+                )}
                 <g className="face">
                   <Eyes state={drawn} />
                   <ellipse cx={58} cy={133} rx={11} ry={6} fill={c.cheek} opacity={0.5} />

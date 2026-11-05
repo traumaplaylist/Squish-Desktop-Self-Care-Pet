@@ -103,6 +103,16 @@
   transform: scaleY(0.12);
 }
 
+/* Пьёт воду: стакан у лапки наклоняется к губам. */
+.pet .glass {
+  transform-box: view-box;
+  transform-origin: 163px 150px;
+  animation: sip 1.4s ease-in-out;
+}
+.pet .hop[data-reaction='drink'] {
+  animation: drink-tilt 1.4s ease-in-out;
+}
+
 /* Радость после перерыва. */
 .pet .hop[data-reaction='celebrate'] {
   animation: celebrate 1.5s cubic-bezier(0.3, 0.7, 0.4, 1);
@@ -267,5 +277,37 @@
   }
   100% {
     transform: translateY(0) scale(1, 1) rotate(0);
+  }
+}
+
+@keyframes sip {
+  0% {
+    opacity: 0;
+    transform: translate(10px, 10px) rotate(0deg);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  45%,
+  70% {
+    transform: translate(-26px, 4px) rotate(-38deg);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes drink-tilt {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  45%,
+  70% {
+    transform: rotate(-6deg) translateY(-2px);
   }
 }

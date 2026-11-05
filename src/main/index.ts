@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { app, BrowserWindow, ipcMain, Menu, powerMonitor, screen } from 'electron';
 import { AcceleratedClock, type Clock } from '../core/clock';
 import { formatTimeOfDay, nextDayBoundary } from '../core/day';
@@ -13,6 +13,9 @@ import { log } from './log';
 import { RealClock } from './realClock';
 import { getKoffiError, loadKoffi, queryUserNotificationState } from './smartPause/fullscreen';
 import { EventLog, JsonStore } from './storage';
+import { registerHotkeys, unregisterHotkeys } from './hotkeys';
+import { SmartPause } from './smartPause';
+import { foregroundProcess, readConsentStore, readConsentStoreViaReg } from './smartPause/win32';
 import { buildMenu, createTray, setTrayTooltip, updateTray, type TrayActions } from './tray';
 import { getDebugWindow, openDebugWindow } from './windows/debug';
 import { OverlayManager } from './windows/overlay';
@@ -37,6 +40,30 @@ if (!app.requestSingleInstanceLock()) {
   void main();
 }
 
+/** Для смоук-теста: koffi-реестр и reg.exe должны видеть одни и те же записи. */
+async function probeConsent(): Promise<ProbeResult['consent']> {
+  const a = await readConsentStore('microphone');
+  const b = await readConsentStoreViaReg('microphone');
+  const keys = (x: typeof a) =>
+    x === 'unknown'
+      ? null
+      : x
+          .map((e) => e.key.toLowerCase())
+          .sort()
+          .join('|');
+  return {
+    koffi: a === 'unknown' ? 'unknown' : a.length,
+    reg: b === 'unknown' ? 'unknown' : b.length,
+    sameKeys: a === 'unknown' || b === 'unknown' ? null : keys(a) === keys(b),
+  };
+}
+
+async function probeForeground(): Promise<ProbeResult['foreground']> {
+  const fg = await foregroundProcess();
+  if (fg === 'unknown') return 'unknown';
+  return fg.path ? basename(fg.path) : null;
+}
+
 async function main(): Promise<void> {
   const real = new RealClock();
   const accel = DEBUG ? new AcceleratedClock(real, DEBUG_SPEED) : null;
@@ -54,14 +81,16 @@ async function main(): Promise<void> {
   const stateStore = new JsonStore<PersistedState>({
     dir: dataDir,
     name: 'state',
-    version: 2,
+    version: 3,
     defaults: () => defaultState(clock.now()),
-    // v1 (День 1) → v2 (День 2): новые поля планировщика.
     migrations: {
+      // v1 (День 1) → v2 (День 2): новые поля планировщика.
       1: (d) => {
         const s = d as PersistedState;
         return { ...s, scheduler: { ...defaultState(clock.now()).scheduler, ...s.scheduler } };
       },
+      // v2 → v3 (День 3): учёт воды.
+      2: (d) => ({ ...(d as PersistedState), water: defaultState(clock.now()).water }),
     },
     now: () => real.now(),
     log,
@@ -85,6 +114,8 @@ async function main(): Promise<void> {
         error: getKoffiError(),
       },
       notificationState: await queryUserNotificationState(),
+      consent: await probeConsent(),
+      foreground: await probeForeground(),
     };
   };
   const probeResult = await probe();
@@ -135,6 +166,9 @@ async function main(): Promise<void> {
           // Досидел — сначала радость, потом окно тает (обрабатывается ниже).
           if (!(finished?.type === 'breakFinished' && finished.completed)) overlay.hide();
           break;
+        case 'petReaction':
+          widget.win.webContents.send('pet:play', e.reaction);
+          break;
         case 'breakFinished':
           if (e.completed) {
             overlay.finish();
@@ -158,8 +192,45 @@ async function main(): Promise<void> {
     getSettings: () => settingsStore.get(),
     appendEvent: (e) => events.append(e),
     onEffects: runEffects,
+    getDetectorReadings: () => {
+      const r = smartPause.readings;
+      return {
+        mic: r.mic,
+        camera: r.camera,
+        fullscreen: r.fullscreen,
+        foregroundExe: r.foregroundExe === 'unknown' ? null : r.foregroundExe,
+      };
+    },
     debug: DEBUG,
   });
+
+  // ── Умная пауза: детекторы раз в 5 с (SPEC 3.3) ──
+  const smartPause = new SmartPause(
+    () => settingsStore.get(),
+    (s) => {
+      engine.setDetectorSuppression(s);
+      publish();
+    },
+  );
+  smartPause.start();
+
+  /** «Не считать это приложение созвоном» (R0): в настройки и сразу переопросить детекторы. */
+  const ignoreQuietApp = () => {
+    const app = engine.getSchedulerState().suppression?.app;
+    if (!app || app === 'debug') return;
+    const st = settingsStore.get();
+    if (st.smartPause.ignoreMicApps.some((a) => a.toLowerCase() === app.toLowerCase())) return;
+    settingsStore.set(
+      {
+        ...st,
+        smartPause: { ...st.smartPause, ignoreMicApps: [...st.smartPause.ignoreMicApps, app] },
+      },
+      0,
+    );
+    log(`умная пауза: «${app}» больше не считается созвоном`);
+    engine.dismissBubble();
+    void smartPause.poll();
+  };
 
   // Для e2e-тестов (только чтение).
   (globalThis as Record<string, unknown>)['__squishPhase'] = () => engine.getSchedulerState().phase;
@@ -186,6 +257,8 @@ async function main(): Promise<void> {
   };
   const trayActions: TrayActions = {
     breakNow: () => engine.breakNowAuto(),
+    water: () => engine.drinkWater(),
+    ignoreQuietApp,
     pause: (m) =>
       engine.dispatch({
         type: 'pause',
@@ -201,10 +274,23 @@ async function main(): Promise<void> {
 
   function updateTrayFromSnapshot(snap: Snapshot): void {
     const v = snap.scheduler;
-    updateTray(trayActions, { paused: v.phase === 'paused' });
+    const quietApp =
+      v.quiet &&
+      (v.quiet.reason === 'mic' || v.quiet.reason === 'camera') &&
+      v.quiet.app !== 'debug'
+        ? v.quiet.app
+        : null;
+    updateTray(trayActions, { paused: v.phase === 'paused', quietApp });
     let tip = t('tray.tooltip');
-    if (v.quiet) tip = t('tray.tooltipQuiet', { reason: t(`quiet.${v.quiet.reason}`) });
-    else if (v.phase === 'paused' && v.pausedUntil)
+    if (v.quiet) {
+      tip =
+        v.quiet.app && v.quiet.app !== 'debug'
+          ? t('tray.tooltipQuietApp', {
+              reason: t(`quiet.${v.quiet.reason}`),
+              app: v.quiet.app.replace(/\.exe$/i, ''),
+            })
+          : t('tray.tooltipQuiet', { reason: t(`quiet.${v.quiet.reason}`) });
+    } else if (v.phase === 'paused' && v.pausedUntil)
       tip = t('tray.pausedUntil', { time: formatTimeOfDay(v.pausedUntil) });
     else if (v.phase === 'offHours') tip = t('tray.tooltipOffHours');
     else if (v.phase === 'onBreak') tip = t('tray.tooltipBreak');
@@ -214,6 +300,18 @@ async function main(): Promise<void> {
   }
 
   if (DEBUG) openDebugWindow();
+
+  // ── Хоткеи (SPEC 7.5): занято → не падаем, список — в снапшоте ──
+  const failed = registerHotkeys(settingsStore.get().hotkeys, {
+    quickTask: () => {
+      engine.showBubble('tasks.soon');
+      publish();
+    },
+    water: () => engine.drinkWater(),
+    breakNow: () => engine.breakNowAuto(),
+    toggleWidget,
+  });
+  engine.setHotkeysFailed(failed);
 
   // ── Tick раз в секунду (реального времени) ──
   const tickTimer = setInterval(() => {
@@ -260,10 +358,25 @@ async function main(): Promise<void> {
   on('widget:dragEnd', () => widget.endDrag());
   on('widget:hover', (h) => widget.setHover(h === true));
   on('widget:contextMenu', () =>
-    buildMenu(trayActions, { paused: engine.getSchedulerState().phase === 'paused' }).popup({
+    buildMenu(trayActions, {
+      paused: engine.getSchedulerState().phase === 'paused',
+      quietApp: engine.snapshot().scheduler.quiet?.app ?? null,
+    }).popup({
       window: widget.win,
     }),
   );
+  on('water:drink', () => engine.drinkWater());
+  on('tasks:open', () => {
+    engine.showBubble('tasks.soon');
+    publish();
+  });
+  on('bubble:action', (a) => {
+    if (a === 'water:drink') engine.drinkWater();
+    else if (a === 'water:undo') engine.undoWater();
+    else if (a === 'quiet:ignoreApp') ignoreQuietApp();
+    else if (a === 'dismiss') engine.dismissBubble();
+    publish();
+  });
   on('break:startNow', () => engine.dispatch({ type: 'startNow' }));
   on('break:postpone', () => engine.dispatch({ type: 'postpone' }));
   on('break:skip', () => engine.dispatch({ type: 'skip' }));
@@ -319,6 +432,8 @@ async function main(): Promise<void> {
   app.on('before-quit', () => {
     quitting = true;
     clearInterval(tickTimer);
+    smartPause.stop();
+    unregisterHotkeys();
     overlay.dispose();
     events.append({ type: 'app_quit', at: clock.now() });
     engine.persistNow();

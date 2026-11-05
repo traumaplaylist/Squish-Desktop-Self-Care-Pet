@@ -11,6 +11,7 @@ export function Widget() {
   const petRef = useRef<PetRenderer | null>(null);
   const [dragging, setDragging] = useState(false);
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  const [hover, setHover] = useState(false);
   const t = useI18n();
 
   // Питомец: создаём один раз, дальше только команды через PetRenderer.
@@ -47,7 +48,19 @@ export function Widget() {
   // Прозрачные места пропускают клики: сообщаем main, над питомцем ли курсор.
   useEffect(() => {
     let last: boolean | null = null;
+    let hideTimer: number | null = null;
     const report = (hit: boolean) => {
+      if (hit) {
+        if (hideTimer !== null) window.clearTimeout(hideTimer);
+        hideTimer = null;
+        setHover(true);
+      } else if (hideTimer === null) {
+        // кнопки исчезают не сразу — чтобы успеть до них дотянуться
+        hideTimer = window.setTimeout(() => {
+          hideTimer = null;
+          setHover(false);
+        }, 1500);
+      }
       if (hit === last) return;
       last = hit;
       window.squish.send('widget:hover', hit);
@@ -117,6 +130,7 @@ export function Widget() {
         onPointerCancel={onPointerUp}
       />
       {snap && <Bubble snap={snap} t={t} />}
+      <HoverButtons visible={hover && !dragging} t={t} />
       <div className="below" />
     </div>
   );
@@ -154,11 +168,49 @@ function Bubble({ snap, t }: { snap: Snapshot; t: T }) {
     );
   }
   if (snap.bubble) {
+    const b = snap.bubble;
     return (
       <div className="bubble" data-hit>
-        {t(snap.bubble.textKey, snap.bubble.params)}
+        <div>{t(b.textKey, b.params)}</div>
+        {b.actions?.length ? (
+          <div className="actions">
+            {b.actions.map((a, i) => (
+              <button
+                key={a.action}
+                className={i === 0 ? 'primary' : ''}
+                onClick={() => window.squish.send('bubble:action', a.action)}
+              >
+                {t(a.labelKey)}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
     );
   }
   return null;
+}
+
+/** Кнопки при наведении (SPEC 2.1): 💧 «выпил воды» и ☑ «задачи». */
+function HoverButtons({ visible, t }: { visible: boolean; t: T }) {
+  return (
+    <div className={`hover-buttons${visible ? ' visible' : ''}`} data-hit>
+      <button
+        className="round"
+        title={t('water.button')}
+        aria-label={t('water.button')}
+        onClick={() => window.squish.send('water:drink', null)}
+      >
+        💧
+      </button>
+      <button
+        className="round"
+        title={t('tasks.button')}
+        aria-label={t('tasks.button')}
+        onClick={() => window.squish.send('tasks:open', null)}
+      >
+        ☑
+      </button>
+    </div>
+  );
 }

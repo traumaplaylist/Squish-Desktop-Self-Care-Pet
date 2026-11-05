@@ -93,3 +93,35 @@ body,
     transform: none;
   }
 }
+
+/* Кнопки при наведении: справа от питомца. */
+.hover-buttons {
+  position: absolute;
+  right: 6px;
+  top: 168px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 160ms ease-out;
+}
+.hover-buttons.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.hover-buttons .round {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #fffdf9;
+  box-shadow: 0 1px 6px rgba(46, 42, 61, 0.18);
+  font-size: 15px;
+  line-height: 30px;
+  padding: 0;
+  cursor: pointer;
+}
+.hover-buttons .round:hover {
+  transform: scale(1.08);
+}

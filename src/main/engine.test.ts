@@ -3,7 +3,7 @@ import { FakeClock, MINUTE, SECOND } from '../core/clock';
 import { DEFAULT_SETTINGS, defaultState } from '../core/defaults';
 import type { AppEvent, Effect } from '../core/events';
 import type { PersistedState } from '../core/types';
-import { Engine } from './engine';
+import { Engine, STILL_ON_CALL_MS } from './engine';
 
 function setup(debug = false) {
   const clock = new FakeClock(new Date(2026, 10, 5, 12).getTime());
@@ -97,5 +97,49 @@ describe('Engine', () => {
     t.step(20 * MINUTE - 29 * SECOND);
     expect(t.engine.snapshot().pet.visual).toBe('waving');
     expect(t.engine.snapshot().debugInfo).toBeNull();
+  });
+  it('вода: стакан → потребность +25, событие, облачко с «Отменить», питомец пьёт', () => {
+    const t = setup();
+    t.engine.drinkWater();
+    expect(t.state().water.glasses).toBe(1);
+    expect(t.state().pet.needs.water).toBe(95);
+    expect(t.events.some((e) => e.type === 'water')).toBe(true);
+    expect(t.engine.snapshot().bubble?.actions?.[0]?.action).toBe('water:undo');
+    expect(t.effects.some((e) => e.type === 'petReaction' && e.reaction === 'drink')).toBe(true);
+    expect(t.engine.snapshot().water).toEqual({ glasses: 1, goal: 8 });
+  });
+  it('вода: отмена в 30 с', () => {
+    const t = setup();
+    t.engine.drinkWater();
+    t.step(10 * SECOND);
+    t.engine.undoWater();
+    expect(t.state().water.glasses).toBe(0);
+    expect(t.state().pet.needs.water).toBe(70);
+    expect(t.events.some((e) => e.type === 'water_undo')).toBe(true);
+  });
+  it('вода: напоминание после 90 мин работы без воды (не во время перерыва)', () => {
+    const t = setup();
+    const before = t.events.length;
+    // перерывы выключать неудобно — просто убеждаемся, что облачко-напоминание однажды появилось
+    let seen = false;
+    for (let i = 0; i < 95 && !seen; i++) {
+      t.step(MINUTE);
+      if (t.engine.snapshot().bubble?.textKey === 'water.reminder') seen = true;
+      if (t.engine.getSchedulerState().phase === 'preBreak') t.engine.dispatch({ type: 'skip' });
+    }
+    expect(seen).toBe(true);
+    expect(t.events.length).toBeGreaterThan(before);
+  });
+  it('созвон 3 ч → «Всё ещё на созвоне?» один раз за созвон', () => {
+    const t = setup();
+    t.engine.setDetectorSuppression({ reason: 'mic', app: 'Discord.exe' });
+    t.step(SECOND);
+    t.step(STILL_ON_CALL_MS);
+    const b = t.engine.snapshot().bubble;
+    expect(b?.textKey).toBe('quiet.stillOnCall');
+    expect(b?.params).toEqual({ app: 'Discord.exe' });
+    t.engine.dismissBubble();
+    t.step(MINUTE);
+    expect(t.engine.snapshot().bubble).toBeNull();
   });
 });

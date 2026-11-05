@@ -1,4 +1,5 @@
 import type { PersistedState, PersistedTasks, Settings } from './types';
+import { defaultWater } from './water';
 
 /** Настройки по умолчанию (SPEC 2.4, R0: рабочие часы выключены). */
 export const DEFAULT_SETTINGS: Settings = {
@@ -78,6 +79,7 @@ export function defaultState(now: number): PersistedState {
       lastTickAt: null,
       naturalCounted: false,
     },
+    water: defaultWater(),
     widget: { position: null, visible: true },
     onboardingDone: false,
     lastDayClosed: null,
