@@ -37,6 +37,10 @@
 - **Смоук** `scripts/smoke.mjs` (Playwright `_electron`): виджет появился, alwaysOnTop, 220×260, koffi загрузился, на Windows `SHQueryUserNotificationState` вернул число, клик → bounce, скриншоты.
 - **Тесты:** 61 зелёный (clock, widgetPosition, notificationState, i18n и паритет ключей ru/en, архитектура, storage, breath).
 
+## CI на Windows — подтверждено (2026-11-05)
+Прогон [CI #2](https://github.com/traumaplaylist/Squish-Desktop-Self-Care-Pet/actions/runs/42076831023) зелёный: typecheck, тесты, установщик `Squish-Setup-0.1.0.exe` (~120 МБ в zip), смоук упакованного `Squish.exe`.
+Проба на Windows Server (runner): `{"platform":"win32-x64","koffi":{"loaded":true,"version":"3.3.7"},"notificationState":6}` — koffi грузится из asar, `SHQueryUserNotificationState` работает. Код **6 = QUNS_QUIET_TIME** («тихий час» новой учётной записи) — подтверждает решение R0 не подавлять по коду 6, иначе на новых ПК перерывов не было бы первый час.
+
 ## Замеры (Linux-контейнер без GPU — это верхняя оценка, не Windows)
 Методика: `npm run build:dir && xvfb-run -a node scripts/measure-idle.mjs` — сумма CPU (utime+stime из /proc) всех процессов приложения за 15 с.
 | Вариант дыхания | CPU, % одного ядра |
@@ -59,7 +63,6 @@ RSS суммарно ≈ 570 МБ (на Linux RSS считает общую па
 
 ## Известные баги / риски
 - CPU в покое на Windows не замерен. Если > 1–2% — варианты: реже тик дыхания (250 мс), дыхание «приступами», выключение дыхания на батарее.
-- CI на `windows-latest` ещё не подтверждён зелёным (первый прогон после пуша этого коммита) — проверить вкладку Actions.
 - `setIgnoreMouseEvents(..., { forward: true })` работает только на Windows/macOS; на Linux прозрачные места виджета кликов не пропускают (не цель продукта).
 
 ## Проверить руками (Windows)

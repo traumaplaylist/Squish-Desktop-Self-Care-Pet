@@ -20,11 +20,11 @@
     "typecheck": "tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.web.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "build:win": "electron-vite build && electron-builder --win nsis --x64",
+    "build:win": "electron-vite build && electron-builder --win nsis --x64 --publish never",
     "smoke": "node scripts/smoke.mjs",
     "icons": "node scripts/make-icons.mjs",
     "measure:idle": "node scripts/measure-idle.mjs",
-    "build:dir": "electron-vite build && electron-builder --linux dir"
+    "build:dir": "electron-vite build && electron-builder --linux dir --publish never"
   },
   "dependencies": {
     "koffi": "^3.3.7"

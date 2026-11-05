@@ -15,8 +15,8 @@ jobs:
     name: Lint · typecheck · tests (Linux)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -29,8 +29,8 @@ jobs:
     name: Windows — тесты, установщик, смоук
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -46,14 +46,14 @@ jobs:
         env:
           SQUISH_EXE: dist/win-unpacked/Squish.exe
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: Squish-Setup
           path: dist/Squish-Setup-*.exe
           if-no-files-found: error
       - name: Upload smoke artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: smoke-windows
           path: smoke-artifacts/
