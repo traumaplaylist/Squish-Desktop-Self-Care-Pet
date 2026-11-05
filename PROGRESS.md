@@ -80,6 +80,7 @@
 - **Срезано [P1]:** capture-детектор (OBS/ShareX/Bandicam как процесс) — Неделя 2. Демонстрацию в Zoom/Teams покрывают микрофон/камера.
 
 ## CI на Windows — подтверждено (2026-11-05)
+- День 4 ([CI #6](https://github.com/traumaplaylist/Squish-Desktop-Self-Care-Pet/actions/runs/42088643707)): на **Windows** все 16 проверок задач зелёные — **быстрый ввод появляется за 13, 6, 5 мс** (бюджет 150), **галочка откликается за 2 мс** (бюджет 50), монеты 9 / энергия 5 сходятся с таблицей. Linux-джоба упала на lint (браузерные глобальные в `scripts/e2e-tasks.mjs`) — исправлено в `5c74519`; урок: перед пушем гонять и `npm run lint`.
 - День 3 ([CI #5](https://github.com/traumaplaylist/Squish-Desktop-Self-Care-Pet/actions/runs/42085416238)): смоук зелёный — ConsentStore\microphone читается через koffi (не `unknown`), набор ключей совпадает с выводом `reg.exe`, окно переднего плана определяется. E2E перерывов + воды (15 проверок) — зелёный на Windows.
 Прогон [CI #2](https://github.com/traumaplaylist/Squish-Desktop-Self-Care-Pet/actions/runs/42076831023) зелёный: typecheck, тесты, установщик `Squish-Setup-0.1.0.exe` (~120 МБ в zip), смоук упакованного `Squish.exe`.
 Проба на Windows Server (runner): `{"platform":"win32-x64","koffi":{"loaded":true,"version":"3.3.7"},"notificationState":6}` — koffi грузится из asar, `SHQueryUserNotificationState` работает. Код **6 = QUNS_QUIET_TIME** («тихий час» новой учётной записи) — подтверждает решение R0 не подавлять по коду 6, иначе на новых ПК перерывов не было бы первый час.
