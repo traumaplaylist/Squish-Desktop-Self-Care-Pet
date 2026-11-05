@@ -12,6 +12,7 @@ export function Widget() {
   const [dragging, setDragging] = useState(false);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [hover, setHover] = useState(false);
+  const [flights, setFlights] = useState<{ id: number; n: number; surprise: boolean }[]>([]);
   const t = useI18n();
 
   // Питомец: создаём один раз, дальше только команды через PetRenderer.
@@ -34,6 +35,12 @@ export function Widget() {
       window.squish.on('pet:play', (r) => void pet.play(r)),
       window.squish.on('pet:eyes', (d) => pet.lookAt(d)),
       window.squish.on('pet:paused', (p) => pet.setPaused(p)),
+      window.squish.on('pet:coins', ({ count, surprise }) => {
+        // Монетки влетают слева (со стороны окна задач) и падают в питомца.
+        const f = { id: Date.now() + Math.random(), n: Math.min(8, Math.max(1, count)), surprise };
+        setFlights((l) => [...l, f]);
+        window.setTimeout(() => setFlights((l) => l.filter((x) => x.id !== f.id)), 1400);
+      }),
     ];
     const onVisibility = () => pet.setPaused(document.hidden);
     document.addEventListener('visibilitychange', onVisibility);
@@ -131,7 +138,18 @@ export function Widget() {
       />
       {snap && <Bubble snap={snap} t={t} />}
       <HoverButtons visible={hover && !dragging} t={t} />
-      <div className="below" />
+      {flights.map((f) => (
+        <div key={f.id} className={`flight${f.surprise ? ' gold' : ''}`}>
+          {Array.from({ length: f.n }, (_, i) => (
+            <span key={i} className="coin" style={{ ['--i' as string]: String(i) }} />
+          ))}
+        </div>
+      ))}
+      <div className="below">
+        {snap && snap.tasksToday.total > 0 && (
+          <span className="counter">{t('tasks.counter', snap.tasksToday)}</span>
+        )}
+      </div>
     </div>
   );
 }

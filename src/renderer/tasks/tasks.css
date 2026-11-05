@@ -1,0 +1,333 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+.tasks {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+}
+.card {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fffdf9;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px rgba(46, 42, 61, 0.18);
+  padding: 12px;
+  font-size: 13.5px;
+  overflow: hidden;
+}
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+h1 {
+  font-size: 16px;
+  margin: 0;
+}
+.stats {
+  display: flex;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #7a7299;
+}
+.quick-input {
+  font: inherit;
+  width: 100%;
+  border: 1.5px solid #e6dff0;
+  border-radius: 12px;
+  padding: 9px 12px;
+  outline: none;
+  background: #fff;
+}
+.quick-input:focus {
+  border-color: #9ee6cf;
+  box-shadow: 0 0 0 3px rgba(158, 230, 207, 0.35);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+.chip {
+  font: inherit;
+  font-size: 11.5px;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 9px;
+  background: #f1ecf8;
+  color: #4b4566;
+  cursor: pointer;
+}
+.chip:hover {
+  background: #e7f8f1;
+}
+.link {
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  background: none;
+  color: #6f62a3;
+  cursor: pointer;
+  padding: 6px 2px 0;
+  text-align: left;
+}
+.list {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 10px;
+  padding-right: 2px;
+}
+.empty {
+  color: #8b84a6;
+  font-size: 12.5px;
+  padding: 18px 6px;
+  text-align: center;
+}
+.item {
+  border-radius: 12px;
+  padding: 2px 4px;
+}
+.item:hover {
+  background: #faf6ff;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 200ms;
+}
+.is-done > .row .title,
+.row.sub.is-done .sub-input {
+  color: #a39dbb;
+  text-decoration: line-through;
+  text-decoration-color: rgba(163, 157, 187, 0.7);
+}
+.edit,
+.sub-input {
+  flex: 1;
+  font: inherit;
+  border: none;
+  border-bottom: 1.5px solid #e6dff0;
+  background: transparent;
+  outline: none;
+  padding: 2px 0;
+}
+.sub-input:focus,
+.edit:focus {
+  border-color: #9ee6cf;
+}
+.kids {
+  margin-left: 26px;
+}
+.row.sub {
+  min-height: 28px;
+}
+.size {
+  font-size: 10.5px;
+  border-radius: 6px;
+  padding: 1px 6px;
+  background: #f1ecf8;
+  color: #6f62a3;
+}
+.size-L {
+  background: #ffe9dc;
+  color: #b05d2e;
+}
+.icon {
+  font-size: 11px;
+  color: #8b84a6;
+}
+.actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.item:hover .actions {
+  opacity: 1;
+}
+.mini {
+  font: inherit;
+  font-size: 11px;
+  border: none;
+  border-radius: 8px;
+  padding: 2px 7px;
+  background: #f1ecf8;
+  cursor: pointer;
+}
+.mini.x {
+  background: none;
+  color: #a39dbb;
+}
+
+/* ── Галочка: пружинит, заливается, рисует штрих (< 50 мс до старта — оптимистично) ── */
+.check {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #c9c1dc;
+  background: #fff;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition:
+    background 160ms ease-out,
+    border-color 160ms ease-out;
+}
+.check.small {
+  width: 18px;
+  height: 18px;
+}
+.check:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.check:hover:not(:disabled) {
+  border-color: #6fcbaf;
+}
+.check svg {
+  width: 70%;
+  height: 70%;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 16;
+  stroke-dashoffset: 16;
+}
+.check.on {
+  background: #6fcbaf;
+  border-color: #6fcbaf;
+  animation: check-pop 360ms cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.check.on svg {
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 220ms 60ms ease-out;
+}
+@keyframes check-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(0.78);
+  }
+  70% {
+    transform: scale(1.22);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ── Монетки разлетаются из галочки в сторону питомца ── */
+.burst {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+.coin {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3b0, #f7c948 55%, #d99a17);
+  box-shadow: 0 1px 2px rgba(120, 80, 0, 0.35);
+  animation: coin-fly 900ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  animation-delay: calc(var(--i) * 45ms);
+  opacity: 0;
+}
+@keyframes coin-fly {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.4);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(calc((var(--i) - 2) * 9px), -26px) scale(1.1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(220px + var(--i) * 8px), calc(-40px - var(--i) * 6px)) scale(0.7);
+  }
+}
+.surprise {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fff3b0, #f7c948);
+  color: #6b4400;
+  font-weight: 700;
+  box-shadow: 0 4px 16px rgba(247, 201, 72, 0.6);
+  animation: surprise 1.6s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes surprise {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1.15);
+  }
+  35% {
+    transform: translateX(-50%) scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+}
+.toast {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #2e2a3d;
+  color: #fff;
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+}
+.toast button {
+  font: inherit;
+  border: none;
+  background: none;
+  color: #9ee6cf;
+  cursor: pointer;
+  font-weight: 600;
+}

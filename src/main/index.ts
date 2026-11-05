@@ -1,24 +1,27 @@
+import { randomUUID } from 'node:crypto';
 import { basename, join } from 'node:path';
 import { app, BrowserWindow, ipcMain, Menu, powerMonitor, screen } from 'electron';
 import { AcceleratedClock, type Clock } from '../core/clock';
 import { formatTimeOfDay, nextDayBoundary } from '../core/day';
-import { DEFAULT_SETTINGS, defaultState } from '../core/defaults';
+import { dayKey } from '../core/day';
+import { DEFAULT_SETTINGS, defaultState, defaultTasks } from '../core/defaults';
 import type { Effect } from '../core/events';
 import type { ProbeResult, RendererCommands, RendererInvokes } from '../core/ipc';
 import { classifyNotificationState } from '../core/notificationState';
-import type { PersistedState, Settings, Snapshot } from '../core/types';
+import type { PersistedState, PersistedTasks, Settings, Snapshot } from '../core/types';
 import { Engine } from './engine';
 import { getDict, setLang, t } from './i18n';
 import { log } from './log';
 import { RealClock } from './realClock';
 import { getKoffiError, loadKoffi, queryUserNotificationState } from './smartPause/fullscreen';
-import { EventLog, JsonStore } from './storage';
+import { dailyBackup, EventLog, JsonStore } from './storage';
 import { registerHotkeys, unregisterHotkeys } from './hotkeys';
 import { SmartPause } from './smartPause';
 import { foregroundProcess, readConsentStore, readConsentStoreViaReg } from './smartPause/win32';
 import { buildMenu, createTray, setTrayTooltip, updateTray, type TrayActions } from './tray';
 import { getDebugWindow, openDebugWindow } from './windows/debug';
 import { OverlayManager } from './windows/overlay';
+import { TasksWindow } from './windows/tasks';
 import { createWidgetWindow, type WidgetController } from './windows/widget';
 
 const DEBUG = process.env['SQUISH_DEBUG'] === '1';
@@ -77,6 +80,7 @@ async function main(): Promise<void> {
     defaults: () => structuredClone(DEFAULT_SETTINGS),
     now: () => real.now(),
     log,
+    backupDir: join(dataDir, 'backups'),
   });
   const stateStore = new JsonStore<PersistedState>({
     dir: dataDir,
@@ -94,8 +98,20 @@ async function main(): Promise<void> {
     },
     now: () => real.now(),
     log,
+    backupDir: join(dataDir, 'backups'),
+  });
+  const tasksStore = new JsonStore<PersistedTasks>({
+    dir: dataDir,
+    name: 'tasks',
+    version: 1,
+    defaults: () => defaultTasks(),
+    now: () => real.now(),
+    log,
+    backupDir: join(dataDir, 'backups'),
   });
   const events = new EventLog(dataDir);
+  const backup = (day: string) => dailyBackup(dataDir, ['settings', 'state', 'tasks'], day, 7, log);
+  backup(dayKey(clock.now()));
   setLang(settingsStore.get().lang);
 
   await app.whenReady();
@@ -169,6 +185,12 @@ async function main(): Promise<void> {
         case 'petReaction':
           widget.win.webContents.send('pet:play', e.reaction);
           break;
+        case 'coins':
+          if (e.count > 0 || e.surprise) {
+            widget.win.webContents.send('pet:coins', { count: e.count, surprise: e.surprise });
+            tasksWin.win.webContents.send('pet:coins', { count: e.count, surprise: e.surprise });
+          }
+          break;
         case 'breakFinished':
           if (e.completed) {
             overlay.finish();
@@ -190,6 +212,13 @@ async function main(): Promise<void> {
     getState: () => stateStore.get(),
     setState: (s, delay) => stateStore.set(s, delay),
     getSettings: () => settingsStore.get(),
+    getTasks: () => tasksStore.get(),
+    setTasks: (t, delay) => tasksStore.set(t, delay),
+    newId: () => randomUUID(),
+    onTasksChanged: (v) => {
+      if (!tasksWin.win.isDestroyed()) tasksWin.win.webContents.send('tasks', v);
+    },
+    onNewDay: (day) => backup(day),
     appendEvent: (e) => events.append(e),
     onEffects: runEffects,
     getDetectorReadings: () => {
@@ -213,6 +242,16 @@ async function main(): Promise<void> {
     },
   );
   smartPause.start();
+
+  // ── Окно задач: создано заранее и спрятано (SPEC 2.7: появление < 150 мс) ──
+  const tasksWin = new TasksWindow({
+    hideFromCapture: settingsStore.get().general.hideFromCapture,
+    anchor: () => widget.win.getBounds(),
+  });
+  (globalThis as Record<string, unknown>)['__squishTasksLatency'] = () => tasksWin.lastLatencyMs;
+  // Для e2e: показать окно задач так же, как хоткей Ctrl+Alt+T (хоткей в Xvfb не нажать).
+  (globalThis as Record<string, unknown>)['__squishShowTasks'] = (m: 'quick' | 'panel') =>
+    tasksWin.show(m);
 
   /** «Не считать это приложение созвоном» (R0): в настройки и сразу переопросить детекторы. */
   const ignoreQuietApp = () => {
@@ -258,6 +297,7 @@ async function main(): Promise<void> {
   const trayActions: TrayActions = {
     breakNow: () => engine.breakNowAuto(),
     water: () => engine.drinkWater(),
+    newTask: () => tasksWin.show('quick'),
     ignoreQuietApp,
     pause: (m) =>
       engine.dispatch({
@@ -303,10 +343,7 @@ async function main(): Promise<void> {
 
   // ── Хоткеи (SPEC 7.5): занято → не падаем, список — в снапшоте ──
   const failed = registerHotkeys(settingsStore.get().hotkeys, {
-    quickTask: () => {
-      engine.showBubble('tasks.soon');
-      publish();
-    },
+    quickTask: () => tasksWin.toggle('quick'),
     water: () => engine.drinkWater(),
     breakNow: () => engine.breakNowAuto(),
     toggleWidget,
@@ -348,6 +385,7 @@ async function main(): Promise<void> {
 
   handle('app:getSnapshot', () => engine.snapshot());
   handle('app:getLangDict', () => getDict());
+  handle('tasks:get', () => engine.tasksView());
   handle('debug:probe', probe);
 
   on('widget:click', () => log('питомец: клик'));
@@ -366,10 +404,28 @@ async function main(): Promise<void> {
     }),
   );
   on('water:drink', () => engine.drinkWater());
-  on('tasks:open', () => {
-    engine.showBubble('tasks.soon');
-    publish();
+  on('tasks:open', () => tasksWin.toggle('panel'));
+  const taskCmd = <K extends keyof RendererCommands>(ch: K, fn: (p: RendererCommands[K]) => void) =>
+    on(ch, (p) => {
+      fn(p);
+      publish();
+    });
+  taskCmd('tasks:create', (p) => {
+    if (typeof p?.text === 'string') engine.createTaskFromText(p.text);
   });
+  taskCmd('tasks:complete', (id) => typeof id === 'string' && engine.completeTask(id));
+  taskCmd('tasks:uncomplete', (id) => typeof id === 'string' && engine.uncompleteTask(id));
+  taskCmd('tasks:split', (id) => typeof id === 'string' && engine.splitTask(id));
+  taskCmd('tasks:rename', (p) => {
+    if (typeof p?.id === 'string' && typeof p.title === 'string') engine.renameTask(p.id, p.title);
+  });
+  taskCmd('tasks:blurSubtasks', (id) => typeof id === 'string' && engine.blurSubtasks(id));
+  taskCmd('tasks:delete', (id) => typeof id === 'string' && engine.deleteTask(id));
+  taskCmd('tasks:undoDelete', () => engine.undoDelete());
+  taskCmd('tasks:reorder', (ids) => Array.isArray(ids) && engine.reorderTasks(ids));
+  on('tasks:hide', () => tasksWin.hide());
+  on('tasks:setMode', (m) => (m === 'quick' || m === 'panel') && tasksWin.setMode(m));
+  on('tasks:shown', (t0) => tasksWin.shown(t0));
   on('bubble:action', (a) => {
     if (a === 'water:drink') engine.drinkWater();
     else if (a === 'water:undo') engine.undoWater();
@@ -438,6 +494,7 @@ async function main(): Promise<void> {
     events.append({ type: 'app_quit', at: clock.now() });
     engine.persistNow();
     stateStore.flush();
+    tasksStore.flush();
     settingsStore.flush();
   });
 }

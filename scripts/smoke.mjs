@@ -75,7 +75,7 @@ try {
     })),
   );
   console.log('windows:', JSON.stringify(info));
-  const wInfo = info.find((w) => w.title.startsWith('Squish —') && w.alwaysOnTop);
+  const wInfo = info.find((w) => w.title.startsWith('Squish —') && w.alwaysOnTop && w.visible);
   if (!wInfo) fail('виджет не alwaysOnTop');
   else if (wInfo.bounds.width !== 240 || wInfo.bounds.height !== 340)
     fail(`размер виджета ${JSON.stringify(wInfo.bounds)}`);

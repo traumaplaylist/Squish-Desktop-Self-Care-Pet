@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FakeClock, MINUTE, SECOND } from '../core/clock';
-import { DEFAULT_SETTINGS, defaultState } from '../core/defaults';
+import { DEFAULT_SETTINGS, defaultState, defaultTasks } from '../core/defaults';
+import type { TasksState } from '../core/tasks';
 import type { AppEvent, Effect } from '../core/events';
 import type { PersistedState } from '../core/types';
 import { Engine, STILL_ON_CALL_MS } from './engine';
@@ -11,6 +12,8 @@ function setup(debug = false) {
   let idleMs = 0;
   let state: PersistedState = defaultState(clock.now());
   const saves: number[] = [];
+  let tasks: TasksState = defaultTasks();
+  let idN = 0;
   const events: AppEvent[] = [];
   const effects: Effect[] = [];
   const engine = new Engine({
@@ -24,6 +27,11 @@ function setup(debug = false) {
       saves.push(delay);
     },
     getSettings: () => DEFAULT_SETTINGS,
+    getTasks: () => tasks,
+    setTasks: (t) => {
+      tasks = t;
+    },
+    newId: () => `id${++idN}`,
     appendEvent: (e) => events.push(e),
     onEffects: (fx) => effects.push(...fx),
     debug,
@@ -44,6 +52,7 @@ function setup(debug = false) {
     saves,
     setIdle: (v: number) => (idleMs = v),
     state: () => state,
+    tasks: () => tasks,
   };
 }
 
@@ -141,5 +150,81 @@ describe('Engine', () => {
     t.engine.dismissBubble();
     t.step(MINUTE);
     expect(t.engine.snapshot().bubble).toBeNull();
+  });
+  it('задачи: ввод → галочка → +энергия +монеты, монетки летят, питомец ловит', () => {
+    const t = setup();
+    t.step(SECOND);
+    const id = t.engine.createTaskFromText('сдать отчёт!')!;
+    expect(t.state().economy.coins).toBe(1); // за создание
+    t.engine.completeTask(id);
+    expect(t.state().economy.coins).toBe(1 + 6);
+    expect(t.state().pet.energyToday).toBe(4);
+    expect(t.effects.some((e) => e.type === 'coins' && e.count === 6)).toBe(true);
+    expect(t.effects.some((e) => e.type === 'petReaction' && e.reaction === 'coinCatch')).toBe(
+      true,
+    );
+    expect(t.engine.snapshot().tasksToday).toEqual({ done: 1, total: 1 });
+    expect(t.events.map((e) => e.type)).toEqual(
+      expect.arrayContaining(['task_created', 'task_completed']),
+    );
+  });
+  it('задачи: снять галочку → награда откатывается, повторная отметка не даёт больше', () => {
+    const t = setup();
+    t.step(SECOND);
+    const id = t.engine.createTaskFromText('отчёт')!;
+    t.engine.completeTask(id);
+    const coins = t.state().economy.coins;
+    t.engine.uncompleteTask(id);
+    expect(t.state().economy.coins).toBe(coins - 1);
+    t.engine.completeTask(id);
+    t.engine.uncompleteTask(id);
+    t.engine.completeTask(id);
+    expect(t.state().economy.coins).toBe(coins);
+  });
+  it('задачи: удаление и «Отменить» в 5 с', () => {
+    const t = setup();
+    const id = t.engine.createTaskFromText('a')!;
+    t.engine.deleteTask(id);
+    expect(t.engine.tasksView().open).toHaveLength(0);
+    expect(t.engine.tasksView().canUndoDelete).toBe(true);
+    t.engine.undoDelete();
+    expect(t.engine.tasksView().open).toHaveLength(1);
+  });
+  it('мусорный ввод не создаёт задачу', () => {
+    const t = setup();
+    expect(t.engine.createTaskFromText('  !!! ')).toBeNull();
+    expect(t.tasks().tasks).toHaveLength(0);
+  });
+  it('перерыв досижен → награда (длинный 4/3)', () => {
+    const t = setup();
+    t.step(SECOND);
+    t.engine.dispatch({ type: 'breakNow', kind: 'long' });
+    t.step(5 * MINUTE + SECOND);
+    expect(t.state().economy.coins).toBe(3);
+    expect(t.state().pet.energyToday).toBe(4);
+  });
+  it('вода до цели даёт 1/1, отмена откатывает', () => {
+    const t = setup();
+    t.step(SECOND);
+    t.engine.drinkWater();
+    expect(t.state().economy.coins).toBe(1);
+    t.engine.undoWater();
+    expect(t.state().economy.coins).toBe(0);
+    expect(t.state().pet.energyToday).toBe(0);
+  });
+  it('новый логический день в 06:00: энергия и дневные счётчики с нуля, монеты остаются, новые экземпляры', () => {
+    const t = setup();
+    t.step(SECOND);
+    t.engine.createTaskFromText('зарядка каждый день');
+    t.engine.completeTask(t.engine.tasksView().open[0]!.id);
+    const coins = t.state().economy.coins;
+    t.clock.set(new Date(2026, 10, 6, 6, 0, 1).getTime());
+    t.engine.tick();
+    expect(t.state().pet.energyToday).toBe(0);
+    expect(t.state().economy.coins).toBe(coins);
+    expect(t.state().economy.day).toBe('2026-11-06');
+    const v = t.engine.tasksView();
+    expect(v.open.map((i) => i.title)).toEqual(['зарядка']);
+    expect(v.done).toHaveLength(0);
   });
 });

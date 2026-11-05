@@ -6,6 +6,7 @@ import { t } from './i18n';
 export interface TrayActions {
   breakNow(): void;
   water(): void;
+  newTask(): void;
   ignoreQuietApp(): void;
   pause(minutes: number | 'tomorrow'): void;
   resume(): void;
@@ -31,7 +32,7 @@ export function buildMenu(actions: TrayActions, state: TrayState): Menu {
   const items: MenuItemConstructorOptions[] = [
     { label: t('tray.breakNow'), click: () => actions.breakNow() },
     { label: t('tray.water'), click: () => actions.water() },
-    { label: t('tray.newTask'), click: stub('newTask') },
+    { label: t('tray.newTask'), click: () => actions.newTask() },
     state.paused
       ? { label: t('tray.resume'), click: () => actions.resume() }
       : {

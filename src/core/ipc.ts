@@ -10,6 +10,7 @@ import type {
   PetVisualState,
   Snapshot,
   SuppressReason,
+  TasksView,
 } from './types';
 
 export interface ProbeResult {
@@ -34,6 +35,12 @@ export interface MainEvents {
   'overlay:done': null;
   /** Оверлей: плавно исчезнуть. */
   'overlay:fadeOut': null;
+  /** Окно задач: список изменился. */
+  tasks: TasksView;
+  /** Окно задач: показать в режиме быстрого ввода или панели. t0 — момент вызова (для замера < 150 мс). */
+  'tasks:mode': { mode: 'quick' | 'panel'; t0: number };
+  /** Виджет: монетки летят к питомцу. */
+  'pet:coins': { count: number; surprise: boolean };
 }
 
 /** renderer → main (fire-and-forget) */
@@ -51,6 +58,20 @@ export interface RendererCommands {
   'break:now': BreakKind;
   'water:drink': null;
   'tasks:open': null;
+  'tasks:create': { text: string };
+  'tasks:complete': string;
+  'tasks:uncomplete': string;
+  'tasks:split': string;
+  'tasks:rename': { id: string; title: string };
+  /** Ушли с подзадач родителя — удалить пустые. */
+  'tasks:blurSubtasks': string;
+  'tasks:delete': string;
+  'tasks:undoDelete': null;
+  'tasks:reorder': string[];
+  'tasks:hide': null;
+  'tasks:setMode': 'quick' | 'panel';
+  /** Окно задач видно и поле в фокусе: t0 из 'tasks:mode' (замер). */
+  'tasks:shown': number;
   'bubble:action': BubbleAction;
   'debug:setVisual': PetVisualState | null;
   'debug:setSpeed': number;
@@ -67,6 +88,7 @@ export interface RendererInvokes {
   'app:getSnapshot': { args: null; result: Snapshot };
   'app:getLangDict': { args: null; result: Record<string, string> };
   'debug:probe': { args: null; result: ProbeResult };
+  'tasks:get': { args: null; result: TasksView };
 }
 
 /*
@@ -85,6 +107,18 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'break:now': true,
   'water:drink': true,
   'tasks:open': true,
+  'tasks:create': true,
+  'tasks:complete': true,
+  'tasks:uncomplete': true,
+  'tasks:split': true,
+  'tasks:rename': true,
+  'tasks:blurSubtasks': true,
+  'tasks:delete': true,
+  'tasks:undoDelete': true,
+  'tasks:reorder': true,
+  'tasks:hide': true,
+  'tasks:setMode': true,
+  'tasks:shown': true,
   'bubble:action': true,
   'debug:setVisual': true,
   'debug:setSpeed': true,
@@ -98,6 +132,7 @@ const INVOKES: Record<keyof RendererInvokes, true> = {
   'app:getSnapshot': true,
   'app:getLangDict': true,
   'debug:probe': true,
+  'tasks:get': true,
 };
 const EVENTS: Record<keyof MainEvents, true> = {
   snapshot: true,
@@ -106,6 +141,9 @@ const EVENTS: Record<keyof MainEvents, true> = {
   'pet:paused': true,
   'overlay:done': true,
   'overlay:fadeOut': true,
+  tasks: true,
+  'tasks:mode': true,
+  'pet:coins': true,
 };
 
 export const RENDERER_COMMANDS = Object.keys(COMMANDS) as (keyof RendererCommands)[];

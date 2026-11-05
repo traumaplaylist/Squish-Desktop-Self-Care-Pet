@@ -262,6 +262,28 @@ export interface PersistedTasks {
   journeys: Journey[];
 }
 
+/** Задачи для панели (main → окно задач), только при изменении. */
+export interface TaskItemView {
+  id: string;
+  title: string;
+  size: TaskSize;
+  recurring: boolean;
+  remindAt: TimeOfDay | null;
+  done: boolean;
+  children: { id: string; title: string; done: boolean }[];
+}
+
+export interface TasksView {
+  open: TaskItemView[];
+  done: TaskItemView[];
+  counts: { done: number; total: number };
+  /** Можно отменить удаление (5 с). */
+  canUndoDelete: boolean;
+  /** Подсказки self-care (SPEC 5.3), если включены. */
+  hints: string[];
+  defaultSize: TaskSize;
+}
+
 /** Снапшот, который main рассылает во все окна. */
 export interface Snapshot {
   debug: boolean;
@@ -275,6 +297,8 @@ export interface Snapshot {
     needs: Needs;
   };
   tasksToday: { done: number; total: number };
+  economy: { coins: number; energyToday: number; goal: number };
+  sounds: { enabled: boolean; volume: number };
   scheduler: import('./scheduler').SchedulerView;
   overlayOpacity: number;
   /** Реплика питомца в облачке (не связанная с перерывом). */

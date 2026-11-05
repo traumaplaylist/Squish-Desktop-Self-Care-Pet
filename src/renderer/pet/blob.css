@@ -113,6 +113,11 @@
   animation: drink-tilt 1.4s ease-in-out;
 }
 
+/* Ловит монетки: ждёт, подпрыгивает навстречу, довольный «плюх». */
+.pet .hop[data-reaction='coinCatch'] {
+  animation: coin-catch 900ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
 /* Радость после перерыва. */
 .pet .hop[data-reaction='celebrate'] {
   animation: celebrate 1.5s cubic-bezier(0.3, 0.7, 0.4, 1);
@@ -309,5 +314,21 @@
   45%,
   70% {
     transform: rotate(-6deg) translateY(-2px);
+  }
+}
+
+@keyframes coin-catch {
+  0%,
+  40% {
+    transform: translateY(0) scale(1, 1);
+  }
+  55% {
+    transform: translateY(-14px) scale(0.94, 1.08) rotate(-3deg);
+  }
+  75% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1);
   }
 }

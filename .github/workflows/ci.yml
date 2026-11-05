@@ -47,6 +47,8 @@ jobs:
           SQUISH_EXE: dist/win-unpacked/Squish.exe
       - name: E2E breaks (debug mode, real Windows overlay)
         run: node scripts/e2e-breaks.mjs
+      - name: E2E tasks (quick input < 150 ms, check < 50 ms, coins)
+        run: node scripts/e2e-tasks.mjs
       - name: Upload installer
         uses: actions/upload-artifact@v5
         with:

@@ -125,3 +125,65 @@ body,
 .hover-buttons .round:hover {
   transform: scale(1.08);
 }
+
+/* Счётчик «задачи: 3/7» под питомцем (SPEC 2.1). */
+.below {
+  display: flex;
+  justify-content: center;
+}
+.counter {
+  font-size: 11px;
+  color: #5d5678;
+  background: rgba(255, 253, 249, 0.85);
+  border-radius: 999px;
+  padding: 2px 9px;
+  box-shadow: 0 1px 4px rgba(46, 42, 61, 0.12);
+}
+
+/* Монетки летят в питомца. */
+.flight {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.flight .coin {
+  position: absolute;
+  left: -14px;
+  top: 190px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3b0, #f7c948 55%, #d99a17);
+  box-shadow: 0 1px 2px rgba(120, 80, 0, 0.35);
+  opacity: 0;
+  animation: coin-in 1000ms cubic-bezier(0.25, 0.6, 0.35, 1) forwards;
+  animation-delay: calc(var(--i) * 60ms);
+}
+.flight.gold .coin {
+  width: 18px;
+  height: 18px;
+  box-shadow: 0 0 10px rgba(247, 201, 72, 0.9);
+}
+@keyframes coin-in {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  12% {
+    opacity: 1;
+  }
+  55% {
+    transform: translate(70px, -70px) scale(1);
+  }
+  90% {
+    opacity: 1;
+    transform: translate(126px, 20px) scale(0.8);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(130px, 30px) scale(0.5);
+  }
+}

@@ -27,6 +27,7 @@ const REACTION_MS: Partial<Record<PetReaction, number>> = {
   bounce: 650,
   celebrate: 1500,
   drink: 1400,
+  coinCatch: 900,
 };
 
 interface BlobProps {

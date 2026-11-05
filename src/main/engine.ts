@@ -19,12 +19,33 @@ import type {
   BreakKind,
   Bubble,
   PersistedState,
+  Task,
+  TaskItemView,
+  TasksView,
   PetVisualState,
   SchedulerState,
   Settings,
   Snapshot,
   SuppressReason,
 } from '../core/types';
+import { dailyGoal, economyForDay, payCreation } from '../core/economy';
+import { parseQuickInput } from '../core/quickParse';
+import { rewardBreak, rewardCompletions, rewardWater, revokeTasks } from '../core/rewards';
+import {
+  completeTask,
+  createTask,
+  deleteTask,
+  openDay,
+  removeEmptySubtasks,
+  renameTask,
+  reorderTasks,
+  restoreTasks,
+  setReward,
+  splitTask,
+  todayView,
+  uncompleteTask,
+  type TasksState,
+} from '../core/tasks';
 import { selectVisual } from '../core/visual';
 import { drink, undoDrink, waterForDay, waterTick, type WaterConfig } from '../core/water';
 
@@ -38,6 +59,14 @@ export interface EngineDeps {
   getState: () => PersistedState;
   setState: (s: PersistedState, delayMs?: number) => void;
   getSettings: () => Settings;
+  getTasks: () => TasksState;
+  /** Задачи и экономика пишутся с задержкой 500 мс (R0): краш сразу после галочки её не теряет. */
+  setTasks: (t: TasksState, delayMs?: number) => void;
+  newId: () => string;
+  /** Список задач изменился — разослать в окно задач. */
+  onTasksChanged?: (v: TasksView) => void;
+  /** Начался новый логический день (бэкап и т. п.). */
+  onNewDay?: (day: string) => void;
   appendEvent: (e: AppEvent) => void;
   onEffects: (fx: Effect[]) => void;
   /** Debug: последние показания детекторов. */
@@ -46,6 +75,17 @@ export interface EngineDeps {
 }
 
 const BUBBLE_DEFAULT_MS = 4000;
+const TASK_SAVE_MS = 500;
+const UNDO_DELETE_MS = 5000;
+const SELF_CARE_HINTS = [
+  'hint.lunch',
+  'hint.outside',
+  'hint.airing',
+  'hint.writeClose',
+  'hint.sleep',
+  'hint.back',
+  'hint.notifications',
+];
 const UNDO_BUBBLE_MS = 30_000;
 const REMINDER_BUBBLE_MS = 60_000;
 /** R0: созвон дольше 3 ч подряд — спросить, точно ли это созвон. */
@@ -59,6 +99,8 @@ export class Engine {
   private bubble: (Bubble & { untilReal: number }) | null = null;
   private askedStillOnCallFor: number | null = null;
   private hotkeysFailed: string[] = [];
+  private lastDeleted: { removed: Task[]; untilReal: number } | null = null;
+  private currentDay: string | null = null;
   private visualOverride: PetVisualState | null = null;
   private lastIdleMs = 0;
   private fakeIdleMs: number | null = null;
@@ -88,6 +130,7 @@ export class Engine {
         : this.simSuppression
           ? { reason: this.simSuppression.reason, app: 'debug' }
           : this.detectorSuppression;
+    this.rollDay(now);
     const before = this.sched;
     this.apply({
       type: 'tick',
@@ -96,6 +139,36 @@ export class Engine {
       offHours: isOffHours(this.d.getSettings().smartPause.workHours, now),
     });
     this.afterTick(before, now);
+  }
+
+  /**
+   * Смена логического дня (06:00, R0): дневные счётчики экономики и энергия — с нуля,
+   * тяжёлый день выключается, задачи — новые экземпляры повторяющихся. Догон нескольких
+   * пропущенных дней для серии/заморозок — День 5 (pet.ts).
+   */
+  private rollDay(now: number): void {
+    const day = dayKey(now);
+    if (day === this.currentDay) return;
+    const st = this.d.getState();
+    const wasDay = st.economy.day;
+    this.currentDay = day;
+    if (wasDay === day) {
+      // старт приложения в тот же день — только убедиться, что экземпляры на сегодня есть
+      this.saveTasks(openDay(this.d.getTasks(), day, now, () => this.d.newId()).state);
+      return;
+    }
+    this.d.setState(
+      {
+        ...st,
+        economy: economyForDay(st.economy, day),
+        pet: { ...st.pet, energyToday: 0, hardDay: false },
+        water: waterForDay(st.water, day),
+      },
+      0,
+    );
+    if (st.pet.hardDay) this.d.appendEvent({ type: 'hard_day_off', at: now });
+    this.saveTasks(openDay(this.d.getTasks(), day, now, () => this.d.newId()).state);
+    this.d.onNewDay?.(day);
   }
 
   /** Вода и «всё ещё на созвоне?» — после шага планировщика. */
@@ -158,8 +231,18 @@ export class Engine {
     const now = this.d.clock.now();
     const st = this.d.getState();
     const r = drink(waterForDay(st.water, dayKey(now)), st.pet.needs.water, now, this.waterCfg());
+    const rw = rewardWater(st.economy, r.overGoal);
     this.d.setState(
-      { ...st, water: r.water, pet: { ...st.pet, needs: { ...st.pet.needs, water: r.need } } },
+      {
+        ...st,
+        water: r.water,
+        economy: rw.economy,
+        pet: {
+          ...st.pet,
+          energyToday: st.pet.energyToday + rw.reward.energy,
+          needs: { ...st.pet.needs, water: r.need },
+        },
+      },
       0,
     );
     r.events.forEach((e) => this.d.appendEvent(e));
@@ -179,8 +262,20 @@ export class Engine {
     const st = this.d.getState();
     const r = undoDrink(st.water, st.pet.needs.water, now);
     if (!r) return;
+    // Отмена стакана откатывает его награду (без ухода в минус).
+    const overGoal = st.water.glasses > this.waterCfg().goalGlasses;
+    const back = overGoal ? { energy: 0, coins: 0 } : { energy: 1, coins: 1 };
     this.d.setState(
-      { ...st, water: r.water, pet: { ...st.pet, needs: { ...st.pet.needs, water: r.need } } },
+      {
+        ...st,
+        water: r.water,
+        economy: { ...st.economy, coins: Math.max(0, st.economy.coins - back.coins) },
+        pet: {
+          ...st.pet,
+          energyToday: Math.max(0, st.pet.energyToday - back.energy),
+          needs: { ...st.pet.needs, water: r.need },
+        },
+      },
       0,
     );
     r.events.forEach((e) => this.d.appendEvent(e));
@@ -194,6 +289,185 @@ export class Engine {
 
   setHotkeysFailed(names: string[]): void {
     this.hotkeysFailed = names;
+  }
+
+  // ───────────── Задачи ─────────────
+  private saveTasks(t: TasksState): void {
+    this.d.setTasks(t, TASK_SAVE_MS);
+    this.d.onTasksChanged?.(this.tasksView());
+  }
+
+  tasksView(): TasksView {
+    const now = this.d.clock.now();
+    const v = todayView(this.d.getTasks(), dayKey(now), dayKey);
+    const item = (i: (typeof v.open)[number]): TaskItemView => ({
+      id: i.task.id,
+      title: i.task.title,
+      size: i.task.size,
+      recurring: i.recurring,
+      remindAt: i.task.remindAt ?? null,
+      done: !!i.task.doneAt,
+      children: i.children.map((c) => ({ id: c.id, title: c.title, done: !!c.doneAt })),
+    });
+    const settings = this.d.getSettings();
+    return {
+      open: v.open.map(item),
+      done: v.done.map(item),
+      counts: v.counts,
+      canUndoDelete: !!this.lastDeleted && this.d.realNow() < this.lastDeleted.untilReal,
+      hints: settings.tasks.showSelfCareHints ? SELF_CARE_HINTS : [],
+      defaultSize: settings.tasks.defaultSize,
+    };
+  }
+
+  /** Быстрый ввод: разбор префиксов, +1 монета за создание (≤ 5 в день). Пустой ввод — ничего. */
+  createTaskFromText(text: string): string | null {
+    const parsed = parseQuickInput(text, this.d.getSettings().tasks.defaultSize);
+    if (!parsed) return null;
+    const now = this.d.clock.now();
+    const r = createTask(
+      this.d.getTasks(),
+      parsed,
+      { id: this.d.newId(), instanceId: this.d.newId() },
+      now,
+      dayKey(now),
+    );
+    const st = this.d.getState();
+    const pay = payCreation(economyForDay(st.economy, dayKey(now)));
+    this.d.setState({ ...st, economy: pay.economy }, TASK_SAVE_MS);
+    const shown = r.task ?? r.template!;
+    this.d.appendEvent({
+      type: 'task_created',
+      at: now,
+      taskId: shown.id,
+      size: shown.size,
+      coins: pay.paid,
+    });
+    this.saveTasks(r.state);
+    return shown.id;
+  }
+
+  completeTask(id: string): void {
+    const now = this.d.clock.now();
+    const done = completeTask(this.d.getTasks(), id, now);
+    if (!done.completed.length) return;
+    const st = this.d.getState();
+    const r = rewardCompletions(economyForDay(st.economy, dayKey(now)), done.completed);
+    let tasks = done.state;
+    for (const p of r.paid) {
+      tasks = setReward(tasks, p.taskId, {
+        rewardPaid: { energy: p.energy, coins: p.coins },
+        rewardRevoked: undefined,
+      });
+      this.d.appendEvent({
+        type: 'task_completed',
+        at: now,
+        taskId: p.taskId,
+        energy: p.energy,
+        coins: p.coins,
+        surprise: p.surprise,
+      });
+    }
+    this.d.setState(
+      {
+        ...st,
+        economy: r.economy,
+        pet: { ...st.pet, energyToday: st.pet.energyToday + r.energyDelta },
+      },
+      TASK_SAVE_MS,
+    );
+    this.saveTasks(tasks);
+    const coins = r.paid.reduce((n, p) => n + p.coins, 0);
+    const surprise = r.paid.some((p) => p.surprise);
+    this.d.onEffects([
+      { type: 'petReaction', reaction: 'coinCatch' },
+      { type: 'coins', count: coins, surprise },
+    ]);
+  }
+
+  uncompleteTask(id: string): void {
+    const now = this.d.clock.now();
+    const u = uncompleteTask(this.d.getTasks(), id);
+    if (!u.uncompleted.length) return;
+    const st = this.d.getState();
+    const r = revokeTasks(st.economy, st.pet.energyToday, u.uncompleted);
+    let tasks = u.state;
+    for (const x of r.revoked) {
+      tasks = setReward(tasks, x.taskId, {
+        rewardPaid: undefined,
+        rewardRevoked: { energy: x.energy, coins: x.coins },
+      });
+      this.d.appendEvent({
+        type: 'task_uncompleted',
+        at: now,
+        taskId: x.taskId,
+        energy: x.energy,
+        coins: x.coins,
+      });
+    }
+    this.d.setState(
+      { ...st, economy: r.economy, pet: { ...st.pet, energyToday: r.energyToday } },
+      TASK_SAVE_MS,
+    );
+    this.saveTasks(tasks);
+  }
+
+  splitTask(id: string): void {
+    const now = this.d.clock.now();
+    const r = splitTask(
+      this.d.getTasks(),
+      id,
+      [this.d.newId(), this.d.newId(), this.d.newId()],
+      now,
+    );
+    if (!r.created.length) return;
+    this.d.appendEvent({ type: 'task_split', at: now, taskId: id, count: r.created.length });
+    this.saveTasks(r.state);
+  }
+
+  renameTask(id: string, title: string): void {
+    this.saveTasks(renameTask(this.d.getTasks(), id, String(title).slice(0, 200)));
+  }
+
+  blurSubtasks(parentId: string): void {
+    this.saveTasks(removeEmptySubtasks(this.d.getTasks(), parentId));
+  }
+
+  deleteTask(id: string): void {
+    const r = deleteTask(this.d.getTasks(), id);
+    if (!r.removed.length) return;
+    this.lastDeleted = { removed: r.removed, untilReal: this.d.realNow() + UNDO_DELETE_MS };
+    this.saveTasks(r.state);
+  }
+
+  undoDelete(): void {
+    if (!this.lastDeleted || this.d.realNow() >= this.lastDeleted.untilReal) return;
+    const removed = this.lastDeleted.removed;
+    this.lastDeleted = null;
+    this.saveTasks(restoreTasks(this.d.getTasks(), removed));
+  }
+
+  reorderTasks(ids: string[]): void {
+    this.saveTasks(
+      reorderTasks(
+        this.d.getTasks(),
+        ids.filter((x) => typeof x === 'string'),
+      ),
+    );
+  }
+
+  /** Перерыв досижен — награда (R0). */
+  private rewardFinishedBreak(kind: BreakKind): void {
+    const st = this.d.getState();
+    const r = rewardBreak(economyForDay(st.economy, dayKey(this.d.clock.now())), kind);
+    this.d.setState(
+      {
+        ...st,
+        economy: r.economy,
+        pet: { ...st.pet, energyToday: st.pet.energyToday + r.reward.energy },
+      },
+      0,
+    );
   }
 
   private setBubble(b: Bubble, ttlMs: number): void {
@@ -275,7 +549,13 @@ export class Engine {
         cozy: st.pet.hardDay,
         needs: st.pet.needs,
       },
-      tasksToday: { done: 0, total: 0 },
+      tasksToday: todayView(this.d.getTasks(), dayKey(now), dayKey).counts,
+      economy: {
+        coins: st.economy.coins,
+        energyToday: st.pet.energyToday,
+        goal: dailyGoal(st.pet.hardDay),
+      },
+      sounds: { enabled: settings.pet.sounds, volume: settings.pet.volume },
       scheduler: view,
       overlayOpacity: settings.breaks.overlayOpacity,
       bubble: this.bubble ? (({ untilReal: _u, ...b }) => b)(this.bubble) : null,
@@ -314,6 +594,7 @@ export class Engine {
     for (const e of r.effects) {
       if (e.type === 'log') this.d.appendEvent(e.event);
       if (e.type === 'bubble') this.showBubble(e.textKey, e.params, e.ttlMs);
+      if (e.type === 'breakFinished' && e.completed) this.rewardFinishedBreak(e.kind);
     }
     // Состояние пишем не чаще раза в 10 с (SPEC 6); команды пользователя — сразу.
     this.d.setState(

@@ -6,7 +6,8 @@ import type { AppEvent } from '../core/events';
  * Хранилище на JSON (CLAUDE.md, SPEC 6).
  * Файл: { "schemaVersion": N, "data": ... }. Запись атомарная: tmp → fsync → rename.
  * Повреждённый файл переименовывается в <name>.broken-<ts>.json, приложение стартует с дефолтов.
- * (Ежедневные бэкапы и восстановление из backups/ — День 4.)
+ * Ежедневный бэкап: backups/YYYY-MM-DD/<name>.json, хранятся последние 7 дней.
+ * Повреждённый файл → восстановление из самого свежего целого бэкапа (если есть).
  */
 
 export interface StoreOptions<T> {
@@ -18,6 +19,8 @@ export interface StoreOptions<T> {
   migrations?: Record<number, (data: unknown) => unknown>;
   now: () => number;
   log?: (msg: string) => void;
+  /** Папка бэкапов (backups/) — для восстановления повреждённого файла. */
+  backupDir?: string;
 }
 
 interface Envelope {
@@ -25,7 +28,7 @@ interface Envelope {
   data: unknown;
 }
 
-export type LoadOutcome = 'missing' | 'ok' | 'migrated' | 'broken';
+export type LoadOutcome = 'missing' | 'ok' | 'migrated' | 'broken' | 'restored';
 
 const RENAME_RETRIES = 5;
 
@@ -99,6 +102,41 @@ export class JsonStore<T> {
     this.dirty = false;
   }
 
+  /** Самый свежий целый бэкап этого файла (с миграцией до текущей версии) или undefined. */
+  private restoreFromBackup(): T | undefined {
+    const dir = this.opts.backupDir;
+    if (!dir) return undefined;
+    let days: string[];
+    try {
+      days = fs
+        .readdirSync(dir)
+        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .sort()
+        .reverse();
+    } catch {
+      return undefined;
+    }
+    for (const d of days) {
+      try {
+        const env = JSON.parse(
+          fs.readFileSync(path.join(dir, d, `${this.opts.name}.json`), 'utf8'),
+        ) as Envelope;
+        if (typeof env?.schemaVersion !== 'number' || env.schemaVersion > this.opts.version)
+          continue;
+        let data = env.data;
+        for (let v = env.schemaVersion; v < this.opts.version; v++) {
+          const m = this.opts.migrations?.[v];
+          if (!m) throw new Error('нет миграции');
+          data = m(data);
+        }
+        return data as T;
+      } catch {
+        /* этот бэкап тоже битый — пробуем более старый */
+      }
+    }
+    return undefined;
+  }
+
   private load(): T {
     // Хвост прерванной записи: tmp без rename — просто удаляем.
     try {
@@ -151,6 +189,17 @@ export class JsonStore<T> {
       } catch {
         /* даже если не смогли переименовать — не падаем */
       }
+      const restored = this.restoreFromBackup();
+      if (restored !== undefined) {
+        this.opts.log?.(
+          `storage: ${this.opts.name}.json повреждён (${(e as Error).message}) → восстановлен из бэкапа`,
+        );
+        this.lastLoad = 'restored';
+        this.data = restored;
+        this.dirty = true;
+        this.flush();
+        return restored;
+      }
       this.opts.log?.(
         `storage: ${this.opts.name}.json повреждён (${(e as Error).message}) → ${path.basename(broken)}`,
       );
@@ -158,6 +207,10 @@ export class JsonStore<T> {
       return this.opts.defaults();
     }
   }
+}
+
+export interface StoreRestore<T> {
+  restoreFromBackup(): T | undefined;
 }
 
 /** Месяц по локальному времени: events/YYYY-MM.jsonl */
@@ -202,5 +255,39 @@ export class EventLog {
       }
     }
     return out;
+  }
+}
+
+/**
+ * Ежедневный бэкап (SPEC 6): копии файлов в backups/<day>/, храним последние `keep` дней.
+ * Уже есть бэкап за этот день — ничего не делаем. Ошибки не роняют приложение.
+ */
+export function dailyBackup(
+  baseDir: string,
+  names: string[],
+  day: string,
+  keep = 7,
+  log?: (msg: string) => void,
+): boolean {
+  const root = path.join(baseDir, 'backups');
+  const target = path.join(root, day);
+  try {
+    if (fs.existsSync(target)) return false;
+    fs.mkdirSync(target, { recursive: true });
+    for (const n of names) {
+      const src = path.join(baseDir, `${n}.json`);
+      if (fs.existsSync(src)) fs.copyFileSync(src, path.join(target, `${n}.json`));
+    }
+    const days = fs
+      .readdirSync(root)
+      .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+      .sort();
+    for (const old of days.slice(0, Math.max(0, days.length - keep))) {
+      fs.rmSync(path.join(root, old), { recursive: true, force: true });
+    }
+    return true;
+  } catch (e) {
+    log?.(`backup: ${(e as Error).message}`);
+    return false;
   }
 }

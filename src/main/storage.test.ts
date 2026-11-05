@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventLog, eventFileName, JsonStore, writeFileAtomic } from './storage';
+import { dailyBackup, EventLog, eventFileName, JsonStore, writeFileAtomic } from './storage';
 
 let dir: string;
 beforeEach(() => {
@@ -159,5 +159,49 @@ describe('EventLog', () => {
 
   it('нет файла → пусто', () => {
     expect(new EventLog(dir).readMonth(at)).toEqual([]);
+  });
+});
+
+describe('бэкапы (SPEC 6)', () => {
+  const write = (name: string, data: unknown) =>
+    fs.writeFileSync(path.join(dir, `${name}.json`), JSON.stringify({ schemaVersion: 1, data }));
+
+  it('dailyBackup копирует файлы, раз в день, хранит 7 дней', () => {
+    write('state', { n: 1 });
+    for (let d = 1; d <= 9; d++) {
+      expect(dailyBackup(dir, ['state', 'tasks'], `2026-11-0${d}`)).toBe(true);
+    }
+    expect(dailyBackup(dir, ['state'], '2026-11-09')).toBe(false); // уже есть
+    const days = fs.readdirSync(path.join(dir, 'backups')).sort();
+    expect(days).toEqual([
+      '2026-11-03',
+      '2026-11-04',
+      '2026-11-05',
+      '2026-11-06',
+      '2026-11-07',
+      '2026-11-08',
+      '2026-11-09',
+    ]);
+    expect(fs.existsSync(path.join(dir, 'backups', '2026-11-09', 'state.json'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'backups', '2026-11-09', 'tasks.json'))).toBe(false);
+  });
+
+  it('битый файл → восстановление из свежего целого бэкапа', () => {
+    write('state', { n: 7 });
+    dailyBackup(dir, ['state'], '2026-11-04');
+    write('state', { n: 8 });
+    dailyBackup(dir, ['state'], '2026-11-05');
+    fs.writeFileSync(path.join(dir, 'backups', '2026-11-05', 'state.json'), '{oops'); // и он битый
+    fs.writeFileSync(path.join(dir, 'state.json'), '{"schemaVersion": 1, "da');
+    const s = make({ backupDir: path.join(dir, 'backups') });
+    expect(s.lastLoad).toBe('restored');
+    expect(s.get()).toEqual({ n: 7 });
+    expect(fs.existsSync(path.join(dir, 'state.broken-1234.json'))).toBe(true);
+    expect(make().get()).toEqual({ n: 7 }); // восстановленное записано
+  });
+
+  it('нет бэкапов → дефолты', () => {
+    fs.writeFileSync(path.join(dir, 'state.json'), 'мусор');
+    expect(make({ backupDir: path.join(dir, 'backups') }).lastLoad).toBe('broken');
   });
 });

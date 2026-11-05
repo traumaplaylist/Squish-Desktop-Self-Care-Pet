@@ -52,5 +52,7 @@ export type Effect =
   /** Перерыв закончился: completed — досидел, иначе пропуск/прерывание. Для наград и радости питомца. */
   | { type: 'breakFinished'; kind: BreakKind; completed: boolean }
   | { type: 'petReaction'; reaction: import('./types').PetReaction }
+  /** Монетки летят к питомцу (виджет). */
+  | { type: 'coins'; count: number; surprise: boolean }
   | { type: 'bubble'; textKey: string; params?: Record<string, string | number>; ttlMs: number }
   | { type: 'save' };
