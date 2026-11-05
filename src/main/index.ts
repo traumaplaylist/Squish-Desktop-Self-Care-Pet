@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   const stateStore = new JsonStore<PersistedState>({
     dir: dataDir,
     name: 'state',
-    version: 3,
+    version: 4,
     defaults: () => defaultState(clock.now()),
     migrations: {
       // v1 (День 1) → v2 (День 2): новые поля планировщика.
@@ -95,6 +95,11 @@ async function main(): Promise<void> {
       },
       // v2 → v3 (День 3): учёт воды.
       2: (d) => ({ ...(d as PersistedState), water: defaultState(clock.now()).water }),
+      // v3 → v4 (День 5): цель дня, чек-ин, «Аптечка».
+      3: (d) => {
+        const st = d as PersistedState;
+        return { ...st, pet: { ...defaultState(clock.now()).pet, ...st.pet } };
+      },
     },
     now: () => real.now(),
     log,
@@ -298,6 +303,10 @@ async function main(): Promise<void> {
     breakNow: () => engine.breakNowAuto(),
     water: () => engine.drinkWater(),
     newTask: () => tasksWin.show('quick'),
+    toggleHardDay: () => {
+      engine.setHardDay(!stateStore.get().pet.hardDay);
+      publish();
+    },
     ignoreQuietApp,
     pause: (m) =>
       engine.dispatch({
@@ -320,7 +329,7 @@ async function main(): Promise<void> {
       v.quiet.app !== 'debug'
         ? v.quiet.app
         : null;
-    updateTray(trayActions, { paused: v.phase === 'paused', quietApp });
+    updateTray(trayActions, { paused: v.phase === 'paused', quietApp, hardDay: snap.pet.cozy });
     let tip = t('tray.tooltip');
     if (v.quiet) {
       tip =
@@ -388,7 +397,10 @@ async function main(): Promise<void> {
   handle('tasks:get', () => engine.tasksView());
   handle('debug:probe', probe);
 
-  on('widget:click', () => log('питомец: клик'));
+  on('widget:click', () => {
+    engine.petClicked();
+    publish();
+  });
   on('widget:dragStart', (p) => {
     if (typeof p?.offsetX === 'number' && typeof p?.offsetY === 'number')
       widget.startDrag(p.offsetX, p.offsetY);
@@ -399,6 +411,7 @@ async function main(): Promise<void> {
     buildMenu(trayActions, {
       paused: engine.getSchedulerState().phase === 'paused',
       quietApp: engine.snapshot().scheduler.quiet?.app ?? null,
+      hardDay: stateStore.get().pet.hardDay,
     }).popup({
       window: widget.win,
     }),
@@ -426,11 +439,22 @@ async function main(): Promise<void> {
   on('tasks:hide', () => tasksWin.hide());
   on('tasks:setMode', (m) => (m === 'quick' || m === 'panel') && tasksWin.setMode(m));
   on('tasks:shown', (t0) => tasksWin.shown(t0));
+  taskCmd('tasks:firstAid', (id) => typeof id === 'string' && engine.firstAid(id));
+  on('debug:pet', (cmd) => {
+    if (!DEBUG || !['careDay', 'stageUp', 'needsLow', 'energy', 'coins'].includes(cmd)) return;
+    engine.debugPet(cmd);
+    publish();
+  });
   on('bubble:action', (a) => {
     if (a === 'water:drink') engine.drinkWater();
     else if (a === 'water:undo') engine.undoWater();
     else if (a === 'quiet:ignoreApp') ignoreQuietApp();
     else if (a === 'dismiss') engine.dismissBubble();
+    else if (a === 'hardDay:on') engine.setHardDay(true);
+    else if (a.startsWith('checkin:')) {
+      const m = Number(a.slice(8));
+      if (m >= 1 && m <= 5) engine.answerCheckin(m as 1 | 2 | 3 | 4 | 5);
+    }
     publish();
   });
   on('break:startNow', () => engine.dispatch({ type: 'startNow' }));

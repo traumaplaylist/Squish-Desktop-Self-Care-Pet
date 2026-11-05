@@ -176,6 +176,29 @@ export function Tasks() {
             </button>
           </>
         )}
+        {mode === 'panel' && view?.firstAid && (
+          <div className="first-aid">
+            <div className="fa-title">🩹 {t('firstAid.title')}</div>
+            <div className="fa-items">
+              {view.firstAid.map((a) => (
+                <button
+                  key={a.id}
+                  className={`fa${a.done ? ' done' : ''}`}
+                  disabled={a.done}
+                  onClick={(e) => {
+                    playPop();
+                    playCoin();
+                    window.squish.send('tasks:firstAid', a.id);
+                    e.currentTarget.classList.add('done');
+                  }}
+                >
+                  {a.done ? '✓ ' : ''}
+                  {t(a.labelKey)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {mode === 'panel' && (
           <div className="list">
             {open.length === 0 && <div className="empty">{t('tasks.empty')}</div>}

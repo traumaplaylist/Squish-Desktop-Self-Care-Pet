@@ -96,6 +96,8 @@ export function Widget() {
     press.current = { x: e.clientX, y: e.clientY, dragging: false };
   };
   const onPointerMove = (e: React.PointerEvent) => {
+    onHoverMove(e);
+    if (press.current?.dragging) trackShake(e);
     const p = press.current;
     if (!p || p.dragging) return;
     if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD_PX) {
@@ -116,11 +118,54 @@ export function Widget() {
     if (p.dragging) {
       setDragging(false);
       window.squish.send('widget:dragEnd', null);
+      // Потрясли при перетаскивании — голова кружится.
+      if (shake.current.flips >= 4) void petRef.current?.play('dizzy');
+      shake.current.flips = 0;
     } else {
       void petRef.current?.play('bounce');
       window.squish.send('widget:click', null);
     }
   };
+  // ── Тактильность (SPEC 4.10, P1): без наград, только радость ──
+  const pet = useRef({ lastX: 0, dir: 0, flips: 0, since: 0, cooldown: 0 });
+  const onHoverMove = (e: React.PointerEvent) => {
+    if (press.current) return;
+    const p = pet.current;
+    const now = performance.now();
+    const dx = e.clientX - p.lastX;
+    p.lastX = e.clientX;
+    if (Math.abs(dx) < 2 || now < p.cooldown) return;
+    const dir = Math.sign(dx);
+    if (dir !== p.dir) {
+      if (now - p.since > 1500) p.flips = 0;
+      p.dir = dir;
+      p.flips += 1;
+      p.since = now;
+      // Медленно водит курсором туда-обратно над питомцем — гладит.
+      if (p.flips >= 5) {
+        p.flips = 0;
+        p.cooldown = now + 4000;
+        void petRef.current?.play('purr');
+      }
+    }
+  };
+  const shake = useRef({ lastX: 0, dir: 0, flips: 0, since: 0 });
+  const trackShake = (e: React.PointerEvent) => {
+    const s = shake.current;
+    const dx = e.screenX - s.lastX;
+    s.lastX = e.screenX;
+    if (Math.abs(dx) < 8) return;
+    const dir = Math.sign(dx);
+    if (dir !== s.dir) {
+      const now = performance.now();
+      if (now - s.since > 700) s.flips = 0;
+      s.dir = dir;
+      s.flips += 1;
+      s.since = now;
+    }
+  };
+  const onDoubleClick = () => void petRef.current?.play('giggle'); // пощекотать
+
   const onContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
     window.squish.send('widget:contextMenu', null);
@@ -135,6 +180,7 @@ export function Widget() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        onDoubleClick={onDoubleClick}
       />
       {snap && <Bubble snap={snap} t={t} />}
       <HoverButtons visible={hover && !dragging} t={t} />
@@ -146,6 +192,7 @@ export function Widget() {
         </div>
       ))}
       <div className="below">
+        {snap && <Needs snap={snap} t={t} />}
         {snap && snap.tasksToday.total > 0 && (
           <span className="counter">{t('tasks.counter', snap.tasksToday)}</span>
         )}
@@ -229,6 +276,33 @@ function HoverButtons({ visible, t }: { visible: boolean; t: T }) {
       >
         ☑
       </button>
+    </div>
+  );
+}
+
+function Needs({ snap, t }: { snap: Snapshot; t: T }) {
+  const items: [keyof Snapshot['pet']['needs'], string][] = [
+    ['water', '💧'],
+    ['eyes', '👁'],
+    ['movement', '🤸'],
+  ];
+  return (
+    <div className="needs">
+      {items.map(([k, icon]) => {
+        const v = Math.round(snap.pet.needs[k]);
+        return (
+          <div
+            key={k}
+            className={`need${v < 25 ? ' low' : ''}`}
+            title={`${t(`needs.${k}`)}: ${v}%`}
+          >
+            <span aria-hidden>{icon}</span>
+            <div className="bar">
+              <div className="fill" style={{ width: `${v}%` }} />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -7,6 +7,7 @@ export interface TrayActions {
   breakNow(): void;
   water(): void;
   newTask(): void;
+  toggleHardDay(): void;
   ignoreQuietApp(): void;
   pause(minutes: number | 'tomorrow'): void;
   resume(): void;
@@ -20,6 +21,7 @@ export interface TrayState {
   paused: boolean;
   /** Кто держит микрофон/камеру — для пункта «Не считать X созвоном». */
   quietApp: string | null;
+  hardDay: boolean;
 }
 
 let tray: Tray | null = null;
@@ -51,7 +53,12 @@ export function buildMenu(actions: TrayActions, state: TrayState): Menu {
           },
         ]
       : []),
-    { label: t('tray.hardDay'), type: 'checkbox', checked: false, click: stub('hardDay') },
+    {
+      label: t('tray.hardDay'),
+      type: 'checkbox',
+      checked: state.hardDay,
+      click: () => actions.toggleHardDay(),
+    },
     { type: 'separator' },
     { label: t('tray.home'), click: stub('home') },
     { label: t('tray.settings'), click: stub('settings') },
@@ -68,14 +75,14 @@ export function createTray(actions: TrayActions): Tray {
     icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 16, height: 16 }),
   );
   tray.setToolTip(t('tray.tooltip'));
-  updateTray(actions, { paused: false, quietApp: null });
+  updateTray(actions, { paused: false, quietApp: null, hardDay: false });
   tray.on('click', () => actions.toggleWidget());
   return tray;
 }
 
 /** Меню пересобираем только при смене состояния (пауза, кто держит микрофон). */
 export function updateTray(actions: TrayActions, state: TrayState): void {
-  const key = `${state.paused}|${state.quietApp ?? ''}`;
+  const key = `${state.paused}|${state.quietApp ?? ''}|${state.hardDay}`;
   if (!tray || key === lastKey) return;
   lastKey = key;
   tray.setContextMenu(buildMenu(actions, state));

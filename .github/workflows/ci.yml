@@ -49,6 +49,8 @@ jobs:
         run: node scripts/e2e-breaks.mjs
       - name: E2E tasks (quick input < 150 ms, check < 50 ms, coins)
         run: node scripts/e2e-tasks.mjs
+      - name: E2E pet (check-in, hard day, first aid, needs, stages, petting)
+        run: node scripts/e2e-pet.mjs
       - name: Upload installer
         uses: actions/upload-artifact@v5
         with:

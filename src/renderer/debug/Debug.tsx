@@ -30,11 +30,20 @@ const REACTIONS: PetReaction[] = [
   'coinCatch',
   'straighten',
   'hug',
+  'purr',
+  'giggle',
+  'dizzy',
 ];
 const PALETTES: Palette[] = ['mint', 'peach', 'lavender'];
 const SPEEDS = [1, 10, 60, 600];
 const SUPPRESS: SuppressReason[] = ['mic', 'camera', 'fullscreen'];
-const LATER = ['debug.plusDay', 'debug.stageUp', 'debug.reset', 'debug.drink'];
+const PET_CMDS = [
+  ['careDay', '+1 день заботы'],
+  ['stageUp', 'стадия +1'],
+  ['needsLow', 'потребности → 10'],
+  ['energy', 'энергия +10'],
+  ['coins', 'монеты +50'],
+] as const;
 
 const fmtList = (v: string[] | 'unknown') =>
   v === 'unknown' ? 'unknown' : v.length ? v.join(', ') : 'никто';
@@ -209,11 +218,16 @@ export function Debug() {
         <pre>{probe ? JSON.stringify(probe, null, 2) : '…'}</pre>
       </section>
       <section>
-        <h2>{t('debug.later')}</h2>
-        <div className="row">
-          {LATER.map((k) => (
-            <button key={k} disabled>
-              {t(k)}
+        <h2>{t('debug.pet')}</h2>
+        <pre>
+          {snap
+            ? `стадия: ${snap.pet.stage} · дней заботы: ${snap.pet.careDays} · серия: ${snap.pet.streak}\nэнергия: ${snap.economy.energyToday}/${snap.economy.goal} · монеты: ${snap.economy.coins}\nвода ${Math.round(snap.pet.needs.water)} · глаза ${Math.round(snap.pet.needs.eyes)} · движение ${Math.round(snap.pet.needs.movement)}`
+            : '…'}
+        </pre>
+        <div className="row" style={{ marginTop: 6 }}>
+          {PET_CMDS.map(([cmd, label]) => (
+            <button key={cmd} onClick={() => window.squish.send('debug:pet', cmd)}>
+              {label}
             </button>
           ))}
         </div>

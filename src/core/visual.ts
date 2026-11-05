@@ -1,17 +1,18 @@
 import { getExercise } from './exercises';
+import { needsPose } from './pet';
 import type { SchedulerView } from './scheduler';
-import type { PetVisualState } from './types';
+import type { Needs, PetVisualState } from './types';
 
 /** Не дольше этого без ввода — питомец засыпает (SPEC 4.2). */
 export const SLEEP_IDLE_MS = 15 * 60 * 1000;
 
 /**
- * Визуальное состояние питомца по приоритету SPEC 4.2 (R0: перерыв главнее сна).
- * День 2: перерывы, тишина, сон. Потребности (thirsty/tired/happy) — День 5.
+ * Визуальное состояние по приоритету SPEC 4.2 (R0: перерыв главнее сна):
+ * onBreak → waving → sleeping → adventure → quiet → thirsty → tired → happy → idle.
  */
 export function selectVisual(
   v: SchedulerView,
-  ctx: { idleMs: number; nightNoInput: boolean },
+  ctx: { idleMs: number; nightNoInput: boolean; needs: Needs; adventure?: boolean },
 ): PetVisualState {
   if (v.phase === 'onBreak' && v.break)
     return `onBreak:${getExercise(v.break.exerciseId).petAnimation}`;
@@ -24,6 +25,7 @@ export function selectVisual(
   ) {
     return 'sleeping';
   }
+  if (ctx.adventure) return 'adventure';
   if (v.phase === 'suppressed') return 'quiet';
-  return 'idle';
+  return needsPose(ctx.needs);
 }

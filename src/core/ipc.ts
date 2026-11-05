@@ -72,6 +72,8 @@ export interface RendererCommands {
   'tasks:setMode': 'quick' | 'panel';
   /** Окно задач видно и поле в фокусе: t0 из 'tasks:mode' (замер). */
   'tasks:shown': number;
+  'tasks:firstAid': string;
+  'debug:pet': 'careDay' | 'stageUp' | 'needsLow' | 'energy' | 'coins';
   'bubble:action': BubbleAction;
   'debug:setVisual': PetVisualState | null;
   'debug:setSpeed': number;
@@ -119,6 +121,8 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'tasks:hide': true,
   'tasks:setMode': true,
   'tasks:shown': true,
+  'tasks:firstAid': true,
+  'debug:pet': true,
   'bubble:action': true,
   'debug:setVisual': true,
   'debug:setSpeed': true,

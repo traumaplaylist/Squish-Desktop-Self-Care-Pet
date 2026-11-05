@@ -53,6 +53,9 @@ export function defaultState(now: number): PersistedState {
       eggs: [],
       hardDay: false,
       adventure: null,
+      goalDay: null,
+      checkin: { day: '', mood: null },
+      firstAid: { day: '', done: [] },
     },
     economy: {
       coins: 0,

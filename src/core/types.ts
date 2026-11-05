@@ -87,7 +87,18 @@ export type PetVisualState =
   | `onBreak:${PetAnimation}`;
 
 export type PetReaction =
-  'bounce' | 'drink' | 'celebrate' | 'coinCatch' | 'blink' | 'straighten' | 'hug';
+  | 'bounce'
+  | 'drink'
+  | 'celebrate'
+  | 'coinCatch'
+  | 'blink'
+  | 'straighten'
+  | 'hug'
+  // SPEC 4.10 (тактильность, P1): погладить, пощекотать, потрясти; угостить — Неделя 2
+  | 'purr'
+  | 'giggle'
+  | 'dizzy'
+  | 'eat';
 
 export type AccessoryId = string;
 export type MicroPetId = string;
@@ -116,6 +127,12 @@ export interface PetState {
   /** Модификатор «Тяжёлый день» (R0: cozy), действует до закрытия логического дня. */
   hardDay: boolean;
   adventure: { startedAt: Millis; returnsAt: Millis } | null;
+  /** День, в который цель уже отпраздновали (чтобы радоваться один раз). */
+  goalDay: DayKey | null;
+  /** Чек-ин настроения (SPEC 4.6): питомец спрашивает первым, раз в логический день. */
+  checkin: { day: DayKey; mood: 1 | 2 | 3 | 4 | 5 | null };
+  /** «Аптечка» тяжёлого дня: что уже сделано сегодня. */
+  firstAid: { day: DayKey; done: string[] };
 }
 
 // ───────────── Задачи (SPEC 5) ─────────────
@@ -237,7 +254,17 @@ export interface DisplayInfo {
 }
 
 /** Действия кнопок в облачке питомца. */
-export type BubbleAction = 'water:drink' | 'water:undo' | 'quiet:ignoreApp' | 'dismiss';
+export type BubbleAction =
+  | 'water:drink'
+  | 'water:undo'
+  | 'quiet:ignoreApp'
+  | 'dismiss'
+  | 'checkin:1'
+  | 'checkin:2'
+  | 'checkin:3'
+  | 'checkin:4'
+  | 'checkin:5'
+  | 'hardDay:on';
 
 export interface Bubble {
   textKey: string;
@@ -281,6 +308,8 @@ export interface TasksView {
   canUndoDelete: boolean;
   /** Подсказки self-care (SPEC 5.3), если включены. */
   hints: string[];
+  /** «Аптечка» (SPEC 5.6) — только в тяжёлый день. */
+  firstAid: { id: string; labelKey: string; done: boolean }[] | null;
   defaultSize: TaskSize;
 }
 
@@ -295,6 +324,8 @@ export interface Snapshot {
     visual: PetVisualState;
     cozy: boolean;
     needs: Needs;
+    careDays: number;
+    streak: number;
   };
   tasksToday: { done: number; total: number };
   economy: { coins: number; energyToday: number; goal: number };

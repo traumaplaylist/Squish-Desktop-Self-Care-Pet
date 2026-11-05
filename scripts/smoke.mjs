@@ -66,18 +66,24 @@ try {
     }
   }
 
-  const info = await app.evaluate(({ BrowserWindow }) =>
-    BrowserWindow.getAllWindows().map((w) => ({
-      title: w.getTitle(),
-      bounds: w.getBounds(),
-      visible: w.isVisible(),
-      alwaysOnTop: w.isAlwaysOnTop(),
-    })),
-  );
+  // Виджет показывается по ready-to-show — ждём до 10 с, а не проверяем один раз.
+  let info = [];
+  for (let i = 0; i < 50; i++) {
+    info = await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().map((w) => ({
+        title: w.getTitle(),
+        bounds: w.getBounds(),
+        visible: w.isVisible(),
+        alwaysOnTop: w.isAlwaysOnTop(),
+      })),
+    );
+    if (info.some((w) => w.title.startsWith('Squish —') && w.alwaysOnTop && w.visible)) break;
+    await new Promise((r) => setTimeout(r, 200));
+  }
   console.log('windows:', JSON.stringify(info));
   const wInfo = info.find((w) => w.title.startsWith('Squish —') && w.alwaysOnTop && w.visible);
   if (!wInfo) fail('виджет не alwaysOnTop');
-  else if (wInfo.bounds.width !== 240 || wInfo.bounds.height !== 340)
+  else if (wInfo.bounds.width !== 240 || wInfo.bounds.height !== 360)
     fail(`размер виджета ${JSON.stringify(wInfo.bounds)}`);
 
   await widget.waitForTimeout(800);

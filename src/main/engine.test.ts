@@ -227,4 +227,124 @@ describe('Engine', () => {
     expect(v.open.map((i) => i.title)).toEqual(['зарядка']);
     expect(v.done).toHaveLength(0);
   });
+  it('чек-ин: питомец спрашивает первым при первой активности дня, один раз', () => {
+    const t = setup();
+    t.step(2 * SECOND);
+    const b = t.engine.snapshot().bubble;
+    expect(b?.textKey).toBe('checkin.question');
+    expect(b?.actions?.map((a) => a.action)).toEqual([
+      'checkin:1',
+      'checkin:2',
+      'checkin:3',
+      'checkin:4',
+      'checkin:5',
+    ]);
+    t.engine.answerCheckin(4);
+    expect(t.state().pet.energyToday).toBe(2);
+    expect(t.state().economy.coins).toBe(1);
+    expect(t.events.some((e) => e.type === 'mood_checkin')).toBe(true);
+    t.engine.answerCheckin(5); // второй раз за день — не награждаем
+    expect(t.state().pet.energyToday).toBe(2);
+  });
+  it('чек-ин 😞 → обнимашки и предложение «Тяжёлого дня»', () => {
+    const t = setup();
+    t.step(2 * SECOND);
+    t.engine.answerCheckin(1);
+    expect(t.effects.some((e) => e.type === 'petReaction' && e.reaction === 'hug')).toBe(true);
+    expect(t.engine.snapshot().bubble?.actions?.[0]?.action).toBe('hardDay:on');
+  });
+  it('игнор чек-ина — можно ответить позже кликом по питомцу', () => {
+    const t = setup();
+    t.step(2 * SECOND);
+    t.engine.dismissBubble();
+    t.engine.petClicked();
+    expect(t.engine.snapshot().bubble?.textKey).toBe('checkin.question');
+  });
+  it('тяжёлый день: цель 10, строгость мягкая, cozy, «Аптечка» по разу на действие', () => {
+    const t = setup();
+    t.step(SECOND);
+    t.engine.setHardDay(true);
+    const snap = t.engine.snapshot();
+    expect(snap.economy.goal).toBe(10);
+    expect(snap.pet.cozy).toBe(true);
+    expect(t.engine.cfg().strictness).toBe('soft');
+    expect(t.engine.tasksView().firstAid).toHaveLength(6);
+    t.engine.firstAid('breaths');
+    t.engine.firstAid('breaths');
+    expect(t.state().pet.energyToday).toBe(1);
+    expect(t.engine.tasksView().firstAid?.find((x) => x.id === 'breaths')?.done).toBe(true);
+    t.engine.setHardDay(false);
+    expect(t.engine.tasksView().firstAid).toBeNull();
+  });
+  it('потребности убывают в активное время, перерыв восполняет глаза', () => {
+    const t = setup();
+    t.step(2 * SECOND);
+    t.engine.dismissBubble();
+    t.step(19 * MINUTE);
+    expect(t.state().pet.needs.eyes).toBeLessThan(60);
+    t.engine.dispatch({ type: 'breakNow', kind: 'micro' });
+    t.step(21 * SECOND);
+    expect(t.state().pet.needs.eyes).toBeGreaterThan(95);
+  });
+  it('цель дня → радость один раз; новый день → +1 день заботы и серия', () => {
+    const t = setup();
+    t.step(SECOND);
+    t.engine.debugPet('energy');
+    t.engine.debugPet('energy');
+    t.engine.debugPet('energy');
+    t.step(SECOND);
+    expect(t.engine.snapshot().bubble?.textKey).toBe('goal.reached');
+    const celebrations = t.effects.filter(
+      (e) => e.type === 'petReaction' && e.reaction === 'celebrate',
+    ).length;
+    t.step(5 * SECOND);
+    expect(
+      t.effects.filter((e) => e.type === 'petReaction' && e.reaction === 'celebrate').length,
+    ).toBe(celebrations);
+    t.clock.set(new Date(2026, 10, 6, 6, 0, 1).getTime());
+    t.engine.tick();
+    expect(t.state().pet.careDays).toBe(1);
+    expect(t.state().pet.streak).toBe(1);
+    expect(t.state().pet.needs).toEqual({ water: 70, eyes: 100, movement: 100 });
+  });
+  it('5 дней заботы → «Подросток» и облачко «Я подрос!»', () => {
+    const t = setup();
+    t.step(SECOND);
+    for (let i = 0; i < 4; i++) t.engine.debugPet('careDay');
+    t.engine.debugPet('energy');
+    t.engine.debugPet('energy');
+    t.engine.debugPet('energy');
+    t.step(SECOND);
+    t.clock.set(new Date(2026, 10, 6, 7).getTime());
+    t.engine.tick();
+    expect(t.state().pet.stage).toBe('teen');
+    expect(t.engine.snapshot().bubble?.textKey).toBe('pet.grew');
+  });
+  it('на созвоне питомец молчит: ни реплик, ни радости вслух', () => {
+    const t = setup();
+    t.engine.random = () => 0;
+    t.engine.setDetectorSuppression({ reason: 'mic', app: 'Zoom.exe' });
+    t.step(2 * SECOND);
+    t.engine.dismissBubble();
+    t.step(40 * MINUTE);
+    t.engine.petClicked();
+    const b = t.engine.snapshot().bubble;
+    expect(b === null || b.textKey === 'checkin.question').toBe(true);
+  });
+  it('реплика без повода — не раньше чем через 10 мин тишины', () => {
+    const t = setup();
+    t.engine.random = () => 0;
+    t.step(2 * SECOND);
+    t.engine.answerCheckin(3);
+    t.engine.dismissBubble();
+    t.step(9 * MINUTE);
+    expect(t.engine.snapshot().bubble).toBeNull();
+    let said = false;
+    for (let i = 0; i < 120 && !said; i++) {
+      t.step(SECOND);
+      said = !!t.engine.snapshot().bubble?.textKey.startsWith('line.');
+      if (t.engine.getSchedulerState().phase !== 'working') t.engine.dispatch({ type: 'skip' });
+    }
+    expect(said).toBe(true);
+  });
 });

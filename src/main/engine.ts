@@ -18,6 +18,7 @@ import {
 import type {
   BreakKind,
   Bubble,
+  BubbleAction,
   PersistedState,
   Task,
   TaskItemView,
@@ -28,7 +29,20 @@ import type {
   Snapshot,
   SuppressReason,
 } from '../core/types';
-import { dailyGoal, economyForDay, payCreation } from '../core/economy';
+import { dailyGoal, economyForDay, payCoins, payCreation, REWARDS } from '../core/economy';
+import { FIRST_AID, pickLine } from '../core/lines';
+import {
+  catchUpDays,
+  decayNeeds,
+  goalReached,
+  morningPet,
+  needsAfterBreak,
+  needsAfterNaturalBreak,
+  needsPose,
+  STAGE_MIN_DAYS,
+  STAGE_ORDER,
+  stageFor,
+} from '../core/pet';
 import { parseQuickInput } from '../core/quickParse';
 import { rewardBreak, rewardCompletions, rewardWater, revokeTasks } from '../core/rewards';
 import {
@@ -101,6 +115,9 @@ export class Engine {
   private hotkeysFailed: string[] = [];
   private lastDeleted: { removed: Task[]; untilReal: number } | null = null;
   private currentDay: string | null = null;
+  private lastChatterAt: number | null = null;
+  /** Случайность для реплик (в тестах подменяется). */
+  random: () => number = Math.random;
   private visualOverride: PetVisualState | null = null;
   private lastIdleMs = 0;
   private fakeIdleMs: number | null = null;
@@ -157,11 +174,28 @@ export class Engine {
       this.saveTasks(openDay(this.d.getTasks(), day, now, () => this.d.newId()).state);
       return;
     }
+    // Закрыть прошлый день (и все пропущенные, если приложение было закрыто): серия, заморозки, рост.
+    let pet = st.pet;
+    if (wasDay) {
+      const r = catchUpDays(
+        pet,
+        { day: wasDay, goalReached: pet.goalDay === wasDay || goalReached(pet) },
+        day,
+        this.d.getSettings().smartPause.workHours,
+        now,
+      );
+      pet = r.pet;
+      r.events.forEach((e) => this.d.appendEvent(e));
+      if (r.events.some((e) => e.type === 'stage_up')) {
+        this.setBubble({ textKey: 'pet.grew' }, 8000);
+        this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
+      }
+    }
     this.d.setState(
       {
         ...st,
         economy: economyForDay(st.economy, day),
-        pet: { ...st.pet, energyToday: 0, hardDay: false },
+        pet: morningPet(pet),
         water: waterForDay(st.water, day),
       },
       0,
@@ -188,7 +222,17 @@ export class Engine {
       },
       this.waterCfg(),
     );
-    if (r.water !== st.water) this.d.setState({ ...this.d.getState(), water: r.water }, 10_000);
+    // Потребности убывают в активное время (R0: и на созвоне — человек у экрана).
+    const needs = decayNeeds(st.pet.needs, activeDelta);
+    if (r.water !== st.water || needs !== st.pet.needs) {
+      this.d.setState(
+        { ...this.d.getState(), water: r.water, pet: { ...this.d.getState().pet, needs } },
+        10_000,
+      );
+    }
+    this.celebrateGoal(now);
+    this.maybeCheckin(now, after);
+    this.maybeChatter(now, after);
     if (r.remind && !this.bubble) {
       this.setBubble(
         {
@@ -219,6 +263,194 @@ export class Engine {
         10 * MINUTE,
       );
     }
+  }
+
+  /** Цель дня достигнута — радуемся один раз за день (приключения — P1, Неделя 2). */
+  private celebrateGoal(now: number): void {
+    const st = this.d.getState();
+    const day = dayKey(now);
+    if (st.pet.goalDay === day || !goalReached(st.pet)) return;
+    this.d.setState({ ...st, pet: { ...st.pet, goalDay: day } }, 0);
+    if (this.sched.phase === 'suppressed') return; // на созвоне — молча (SPEC 2.1)
+    this.setBubble({ textKey: 'goal.reached' }, 6000);
+    this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
+  }
+
+  /**
+   * Чек-ин (SPEC 4.6): питомец спрашивает сам, первым, при первой активности дня.
+   * R0: можно и вне рабочих часов, но не на созвоне. Игнор — облачко уходит через 3 мин, без последствий.
+   */
+  private maybeCheckin(now: number, s: SchedulerState): void {
+    const st = this.d.getState();
+    const day = dayKey(now);
+    if (st.pet.checkin.day === day || this.bubble) return;
+    if (s.phase !== 'working' && s.phase !== 'offHours') return;
+    if (this.lastIdleMs > 20_000) return; // ждём, пока человек начнёт что-то делать
+    this.d.setState({ ...st, pet: { ...st.pet, checkin: { day, mood: null } } }, 0);
+    this.offerCheckin();
+  }
+
+  private offerCheckin(): void {
+    const faces = ['😞', '😕', '😐', '🙂', '😄'];
+    this.setBubble(
+      {
+        textKey: 'checkin.question',
+        actions: faces.map((f, i) => ({
+          labelKey: f,
+          action: `checkin:${(i + 1) as 1 | 2 | 3 | 4 | 5}` as BubbleAction,
+        })),
+      },
+      3 * MINUTE,
+    );
+  }
+
+  answerCheckin(m: 1 | 2 | 3 | 4 | 5): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const day = dayKey(now);
+    if (st.pet.checkin.day === day && st.pet.checkin.mood !== null) return;
+    const economy = payCoins(economyForDay(st.economy, day), REWARDS.checkin.coins);
+    this.d.setState(
+      {
+        ...st,
+        economy,
+        pet: {
+          ...st.pet,
+          checkin: { day, mood: m },
+          energyToday: st.pet.energyToday + REWARDS.checkin.energy,
+        },
+      },
+      0,
+    );
+    this.d.appendEvent({ type: 'mood_checkin', at: now, mood: m });
+    // Реакция по тону. Никаких выводов и советов на основе настроения (SPEC 4.6).
+    if (m >= 4) {
+      this.setBubble({ textKey: 'checkin.great' }, 3500);
+      this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
+    } else if (m === 3) {
+      this.setBubble({ textKey: 'checkin.ok' }, 3500);
+      this.d.onEffects([{ type: 'petReaction', reaction: 'bounce' }]);
+    } else if (m === 2) {
+      this.setBubble({ textKey: 'checkin.meh' }, 4000);
+      this.d.onEffects([{ type: 'petReaction', reaction: 'hug' }]);
+    } else {
+      this.setBubble(
+        {
+          textKey: 'checkin.hard',
+          actions: st.pet.hardDay
+            ? []
+            : [
+                { labelKey: 'checkin.hardOn', action: 'hardDay:on' },
+                { labelKey: 'checkin.later', action: 'dismiss' },
+              ],
+        },
+        60_000,
+      );
+      this.d.onEffects([{ type: 'petReaction', reaction: 'hug' }]);
+    }
+  }
+
+  /** «Тяжёлый день» (SPEC 5.6): цель 10, мягкая строгость, только поддержка, «Аптечка». До 06:00. */
+  setHardDay(on: boolean): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    if (st.pet.hardDay === on) return;
+    this.d.setState({ ...st, pet: { ...st.pet, hardDay: on } }, 0);
+    this.d.appendEvent({ type: on ? 'hard_day_on' : 'hard_day_off', at: now });
+    this.setBubble({ textKey: on ? 'hardDay.on' : 'hardDay.off' }, 5000);
+    if (on) this.d.onEffects([{ type: 'petReaction', reaction: 'hug' }]);
+    this.d.onTasksChanged?.(this.tasksView());
+  }
+
+  /** Действие «Аптечки»: +1 энергия, +1 монета, по разу в день. */
+  firstAid(id: string): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const day = dayKey(now);
+    if (!st.pet.hardDay || !(FIRST_AID as readonly string[]).includes(id)) return;
+    const done = st.pet.firstAid.day === day ? st.pet.firstAid.done : [];
+    if (done.includes(id)) return;
+    this.d.setState(
+      {
+        ...st,
+        economy: payCoins(economyForDay(st.economy, day), REWARDS.firstAid.coins),
+        pet: {
+          ...st.pet,
+          firstAid: { day, done: [...done, id] },
+          energyToday: st.pet.energyToday + REWARDS.firstAid.energy,
+        },
+      },
+      TASK_SAVE_MS,
+    );
+    this.d.appendEvent({
+      type: 'task_completed',
+      at: now,
+      taskId: `firstAid:${id}`,
+      energy: REWARDS.firstAid.energy,
+      coins: REWARDS.firstAid.coins,
+      surprise: false,
+    });
+    this.d.onEffects([
+      { type: 'petReaction', reaction: 'coinCatch' },
+      { type: 'coins', count: REWARDS.firstAid.coins, surprise: false },
+    ]);
+    this.d.onTasksChanged?.(this.tasksView());
+  }
+
+  /** Клик по питомцу: не ответил на чек-ин — спросить снова; иначе короткая реплика. */
+  petClicked(): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    if (st.pet.checkin.day === dayKey(now) && st.pet.checkin.mood === null) {
+      this.offerCheckin();
+      return;
+    }
+    if (this.sched.phase === 'suppressed' || this.bubble) return;
+    this.say(now, true);
+  }
+
+  /** Реплики без повода — не чаще раза в 10 (часто) / 30 (редко) мин; на умной паузе — ни одной. */
+  private maybeChatter(now: number, s: SchedulerState): void {
+    const chatter = this.d.getSettings().pet.chatter;
+    if (chatter === 'off' || s.phase !== 'working' || this.bubble) return;
+    const gap = (chatter === 'often' ? 10 : 30) * MINUTE;
+    if (this.lastChatterAt === null) this.lastChatterAt = now;
+    if (now - this.lastChatterAt < gap) return;
+    if (this.random() > 0.01) return; // не по будильнику — примерно раз в 100 с после окна
+    this.say(now, false);
+  }
+
+  private say(now: number, click: boolean): void {
+    const st = this.d.getState();
+    const key = pickLine(
+      {
+        hour: new Date(now).getHours(),
+        pose: needsPose(st.pet.needs),
+        hardDay: st.pet.hardDay,
+        click,
+      },
+      this.random(),
+    );
+    this.lastChatterAt = now;
+    this.setBubble({ textKey: key }, 3000);
+  }
+
+  /** Debug-кнопки (SQUISH_DEBUG). */
+  debugPet(cmd: 'careDay' | 'stageUp' | 'needsLow' | 'energy' | 'coins'): void {
+    const st = this.d.getState();
+    let pet = st.pet;
+    let economy = st.economy;
+    if (cmd === 'careDay')
+      pet = { ...pet, careDays: pet.careDays + 1, stage: stageFor(pet.careDays + 1) };
+    if (cmd === 'stageUp') {
+      const next =
+        STAGE_ORDER[Math.min(STAGE_ORDER.length - 1, STAGE_ORDER.indexOf(pet.stage) + 1)]!;
+      pet = { ...pet, stage: next, careDays: Math.max(pet.careDays, STAGE_MIN_DAYS[next]) };
+    }
+    if (cmd === 'needsLow') pet = { ...pet, needs: { water: 10, eyes: 10, movement: 10 } };
+    if (cmd === 'energy') pet = { ...pet, energyToday: pet.energyToday + 10 };
+    if (cmd === 'coins') economy = { ...economy, coins: economy.coins + 50 };
+    this.d.setState({ ...st, pet, economy }, 0);
   }
 
   private waterCfg(): WaterConfig {
@@ -297,6 +529,14 @@ export class Engine {
     this.d.onTasksChanged?.(this.tasksView());
   }
 
+  private firstAidView(): TasksView['firstAid'] {
+    const st = this.d.getState();
+    if (!st.pet.hardDay) return null;
+    const day = dayKey(this.d.clock.now());
+    const done = st.pet.firstAid.day === day ? st.pet.firstAid.done : [];
+    return FIRST_AID.map((id) => ({ id, labelKey: `firstAid.${id}`, done: done.includes(id) }));
+  }
+
   tasksView(): TasksView {
     const now = this.d.clock.now();
     const v = todayView(this.d.getTasks(), dayKey(now), dayKey);
@@ -316,6 +556,7 @@ export class Engine {
       counts: v.counts,
       canUndoDelete: !!this.lastDeleted && this.d.realNow() < this.lastDeleted.untilReal,
       hints: settings.tasks.showSelfCareHints ? SELF_CARE_HINTS : [],
+      firstAid: this.firstAidView(),
       defaultSize: settings.tasks.defaultSize,
     };
   }
@@ -464,7 +705,11 @@ export class Engine {
       {
         ...st,
         economy: r.economy,
-        pet: { ...st.pet, energyToday: st.pet.energyToday + r.reward.energy },
+        pet: {
+          ...st.pet,
+          energyToday: st.pet.energyToday + r.reward.energy,
+          needs: needsAfterBreak(st.pet.needs, kind),
+        },
       },
       0,
     );
@@ -537,6 +782,7 @@ export class Engine {
       selectVisual(view, {
         idleMs: this.lastIdleMs,
         nightNoInput: hour < 6 && this.lastIdleMs > 60_000,
+        needs: st.pet.needs,
       });
     return {
       debug: this.d.debug,
@@ -548,6 +794,8 @@ export class Engine {
         visual,
         cozy: st.pet.hardDay,
         needs: st.pet.needs,
+        careDays: st.pet.careDays,
+        streak: st.pet.streak,
       },
       tasksToday: todayView(this.d.getTasks(), dayKey(now), dayKey).counts,
       economy: {
@@ -592,7 +840,16 @@ export class Engine {
     const r = reduceScheduler(this.sched, ev, now, this.cfg());
     this.sched = r.state;
     for (const e of r.effects) {
-      if (e.type === 'log') this.d.appendEvent(e.event);
+      if (e.type === 'log') {
+        this.d.appendEvent(e.event);
+        if (e.event.type === 'natural_break') {
+          const st = this.d.getState();
+          this.d.setState(
+            { ...st, pet: { ...st.pet, needs: needsAfterNaturalBreak(st.pet.needs) } },
+            10_000,
+          );
+        }
+      }
       if (e.type === 'bubble') this.showBubble(e.textKey, e.params, e.ttlMs);
       if (e.type === 'breakFinished' && e.completed) this.rewardFinishedBreak(e.kind);
     }
