@@ -4,6 +4,7 @@ import { app, BrowserWindow, ipcMain, Menu, nativeTheme, powerMonitor, screen } 
 import { AcceleratedClock, type Clock } from '../core/clock';
 import { formatTimeOfDay, nextDayBoundary } from '../core/day';
 import { dayKey } from '../core/day';
+import { STATE_VERSION, stateMigrations } from '../core/migrations';
 import { DEFAULT_SETTINGS, defaultState, defaultTasks } from '../core/defaults';
 import type { Effect } from '../core/events';
 import type { ProbeResult, RendererCommands, RendererInvokes } from '../core/ipc';
@@ -87,22 +88,9 @@ async function main(): Promise<void> {
   const stateStore = new JsonStore<PersistedState>({
     dir: dataDir,
     name: 'state',
-    version: 4,
+    version: STATE_VERSION,
     defaults: () => defaultState(clock.now()),
-    migrations: {
-      // v1 (День 1) → v2 (День 2): новые поля планировщика.
-      1: (d) => {
-        const s = d as PersistedState;
-        return { ...s, scheduler: { ...defaultState(clock.now()).scheduler, ...s.scheduler } };
-      },
-      // v2 → v3 (День 3): учёт воды.
-      2: (d) => ({ ...(d as PersistedState), water: defaultState(clock.now()).water }),
-      // v3 → v4 (День 5): цель дня, чек-ин, «Аптечка».
-      3: (d) => {
-        const st = d as PersistedState;
-        return { ...st, pet: { ...defaultState(clock.now()).pet, ...st.pet } };
-      },
-    },
+    migrations: stateMigrations(() => clock.now()),
     now: () => real.now(),
     log,
     backupDir: join(dataDir, 'backups'),
