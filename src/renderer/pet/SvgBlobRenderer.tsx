@@ -13,8 +13,16 @@ import { PALETTES } from './palettes';
 import './blob.css';
 
 /** Состояния, нарисованные на День 1. Остальные пока выглядят как idle (TODO День 5). */
-const DRAWN: ReadonlySet<PetVisualState> = new Set<PetVisualState>(['idle', 'happy', 'sleeping']);
-const REACTION_MS: Partial<Record<PetReaction, number>> = { bounce: 650 };
+const DRAWN: ReadonlySet<PetVisualState> = new Set<PetVisualState>([
+  'idle',
+  'happy',
+  'sleeping',
+  'waving',
+  'onBreak:lookFar',
+  'onBreak:stretchUp',
+  'onBreak:breathe',
+]);
+const REACTION_MS: Partial<Record<PetReaction, number>> = { bounce: 650, celebrate: 1500 };
 
 interface BlobProps {
   state: PetVisualState;
@@ -70,7 +78,7 @@ function Blob(p: BlobProps) {
   const drawn = DRAWN.has(p.state) ? p.state : 'idle';
   const classes = [
     'pet',
-    `state-${drawn}`,
+    `state-${drawn.replace(':', '-')}`,
     `stage-${p.stage}`,
     p.blinking ? 'blink' : '',
     p.cozy ? 'cozy' : '',
@@ -187,7 +195,7 @@ export class SvgBlobRenderer implements PetRenderer {
   }
 
   setStage(stage: GrowthStage): void {
-    this.update({ stage });
+    if (stage !== this.props.stage) this.update({ stage });
   }
 
   setMicroPets(_ids: MicroPetId[]): void {
@@ -208,11 +216,11 @@ export class SvgBlobRenderer implements PetRenderer {
   }
 
   setPalette(palette: Palette): void {
-    this.update({ palette });
+    if (palette !== this.props.palette) this.update({ palette });
   }
 
   setCozy(cozy: boolean): void {
-    this.update({ cozy });
+    if (cozy !== this.props.cozy) this.update({ cozy });
   }
 
   lookAt(dir: { x: number; y: number } | null): void {

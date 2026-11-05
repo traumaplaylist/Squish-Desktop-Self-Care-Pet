@@ -4,9 +4,10 @@ import { resolveWidgetRect, toWidgetPosition } from '../../core/widgetPosition';
 import { t } from '../i18n';
 import { lockDown, loadPage, secureWebPreferences } from './common';
 
-export const WIDGET_SIZE = { width: 220, height: 260 } as const;
-/** Центр питомца внутри окна (для слежения глаз). */
-const PET_CENTER = { x: 110, y: 105 } as const;
+/** Окно выше питомца: сверху место под облачко (preBreak, реплики). Пустота пропускает клики. */
+export const WIDGET_SIZE = { width: 240, height: 340 } as const;
+/** Центр питомца внутри окна (для слежения глаз): .pet-host left 30, top 130, 180×180. */
+const PET_CENTER = { x: 120, y: 225 } as const;
 const EYE_RADIUS = 300;
 
 export function getDisplays(): DisplayInfo[] {

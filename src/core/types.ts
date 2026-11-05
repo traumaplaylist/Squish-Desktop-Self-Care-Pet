@@ -265,7 +265,20 @@ export interface Snapshot {
     needs: Needs;
   };
   tasksToday: { done: number; total: number };
-  nextBreakInSec: number | null;
-  quiet: { reason: SuppressReason; app: string | null } | null;
+  scheduler: import('./scheduler').SchedulerView;
+  overlayOpacity: number;
+  /** Реплика питомца в облачке (не связанная с перерывом). */
+  bubble: { textKey: string; params?: Record<string, string | number> } | null;
   hotkeysFailed: string[];
+  /** Только в SQUISH_DEBUG. */
+  debugInfo: {
+    speed: number;
+    now: number;
+    activeSinceMicroSec: number;
+    activeSinceLongSec: number;
+    dueBreak: BreakKind | null;
+    cooldownSec: number | null;
+    simSuppression: { reason: SuppressReason; untilSec: number } | null;
+    fakeIdleMs: number | null;
+  } | null;
 }

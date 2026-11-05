@@ -84,7 +84,7 @@
   "break.long": "Разминка",
   "break.secLeft": "{sec} с",
   "break.minSecLeft": "{min}:{sec}",
-  "break.done": "Готово! Спасибо, что отдохнул(а)",
+  "break.done": "Готово! Хорошая пауза",
   "break.emergency": "Аварийный выход: Ctrl+Alt+Shift+Esc",
   "break.emergencyExit": "Ладно, в другой раз",
   "break.escHint": "Esc — пропустить",
@@ -107,5 +107,9 @@
   "debug.breakLong": "Длинный сейчас",
   "debug.suppress": "Имитация подавления",
   "debug.suppressOff": "Снять",
-  "debug.minutes": "{n} мин"
+  "debug.minutes": "{n} мин",
+  "debug.input": "Ввод:",
+  "debug.inputReal": "реальный",
+  "debug.inputTyping": "печатаю",
+  "debug.inputAway": "отошёл"
 }

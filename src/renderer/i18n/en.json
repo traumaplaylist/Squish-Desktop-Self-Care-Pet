@@ -84,7 +84,7 @@
   "break.long": "Stretch break",
   "break.secLeft": "{sec} s",
   "break.minSecLeft": "{min}:{sec}",
-  "break.done": "Done! Thanks for taking a break",
+  "break.done": "Done! Nice break",
   "break.emergency": "Emergency exit: Ctrl+Alt+Shift+Esc",
   "break.emergencyExit": "Okay, maybe next time",
   "break.escHint": "Esc — skip",
@@ -107,5 +107,9 @@
   "debug.breakLong": "Long now",
   "debug.suppress": "Simulate suppression",
   "debug.suppressOff": "Clear",
-  "debug.minutes": "{n} min"
+  "debug.minutes": "{n} min",
+  "debug.input": "Input:",
+  "debug.inputReal": "real",
+  "debug.inputTyping": "typing",
+  "debug.inputAway": "away"
 }

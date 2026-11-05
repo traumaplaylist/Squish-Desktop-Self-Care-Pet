@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Snapshot } from '../../core/types';
 import { createPetRenderer } from '../pet/createPetRenderer';
 import type { PetRenderer } from '../pet/PetRenderer';
+import { useI18n } from '../shared/useI18n';
 
 const DRAG_THRESHOLD_PX = 4;
 
@@ -9,6 +10,8 @@ export function Widget() {
   const hostRef = useRef<HTMLDivElement>(null);
   const petRef = useRef<PetRenderer | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [snap, setSnap] = useState<Snapshot | null>(null);
+  const t = useI18n();
 
   // Питомец: создаём один раз, дальше только команды через PetRenderer.
   useEffect(() => {
@@ -18,6 +21,7 @@ export function Widget() {
     petRef.current = pet;
 
     const apply = (s: Snapshot) => {
+      setSnap(s);
       pet.setPalette(s.pet.palette);
       pet.setStage(s.pet.stage);
       pet.setCozy(s.pet.cozy);
@@ -112,7 +116,49 @@ export function Widget() {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       />
+      {snap && <Bubble snap={snap} t={t} />}
       <div className="below" />
     </div>
   );
+}
+
+type T = ReturnType<typeof useI18n>;
+
+/** Облачко над питомцем: preBreak (SPEC 3.2) или реплика. data-hit — чтобы кнопки ловили клики. */
+function Bubble({ snap, t }: { snap: Snapshot; t: T }) {
+  const v = snap.scheduler;
+  if (v.phase === 'preBreak' || v.phase === 'waitingForPause') {
+    return (
+      <div className="bubble" data-hit>
+        <div>
+          {v.phase === 'preBreak'
+            ? t('break.preBreak', { sec: v.preBreakSecLeft ?? 0 })
+            : t('break.waiting')}
+        </div>
+        <div className="actions">
+          <button className="primary" onClick={() => window.squish.send('break:startNow', null)}>
+            {t('break.startNow')}
+          </button>
+          {v.canPostpone && (
+            <button onClick={() => window.squish.send('break:postpone', null)}>
+              {t('break.postpone')}
+            </button>
+          )}
+          {v.canSkip && (
+            <button onClick={() => window.squish.send('break:skip', null)}>
+              {t('break.skip')}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+  if (snap.bubble) {
+    return (
+      <div className="bubble" data-hit>
+        {t(snap.bubble.textKey, snap.bubble.params)}
+      </div>
+    );
+  }
+  return null;
 }

@@ -70,14 +70,14 @@ try {
   console.log('windows:', JSON.stringify(info));
   const wInfo = info.find((w) => w.title.startsWith('Squish —') && w.alwaysOnTop);
   if (!wInfo) fail('виджет не alwaysOnTop');
-  else if (wInfo.bounds.width !== 220 || wInfo.bounds.height !== 260)
+  else if (wInfo.bounds.width !== 240 || wInfo.bounds.height !== 340)
     fail(`размер виджета ${JSON.stringify(wInfo.bounds)}`);
 
   await widget.waitForTimeout(800);
   await widget.screenshot({ path: join(outDir, 'widget.png') });
   // Клик по питомцу → bounce.
   // Питомец дышит (элемент «не стабилен» для locator.click) — кликаем мышью в центр питомца.
-  await widget.mouse.click(110, 110);
+  await widget.mouse.click(120, 225);
   await widget.waitForTimeout(250);
   const reaction = await widget.locator('.pet .hop').first().getAttribute('data-reaction');
   if (reaction !== 'bounce') fail(`после клика ожидалась реакция bounce, а не «${reaction}»`);

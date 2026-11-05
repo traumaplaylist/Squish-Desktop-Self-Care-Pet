@@ -14,10 +14,17 @@ export function secureWebPreferences(): BrowserWindowConstructorOptions['webPref
 }
 
 /** Загрузить страницу renderer: dev-сервер или собранный файл. */
-export function loadPage(win: BrowserWindow, page: 'widget' | 'debug'): Promise<void> {
+export function loadPage(
+  win: BrowserWindow,
+  page: 'widget' | 'debug' | 'overlay',
+  query: Record<string, string> = {},
+): Promise<void> {
   const devUrl = process.env['ELECTRON_RENDERER_URL'];
-  if (devUrl) return win.loadURL(`${devUrl}/${page}/index.html`);
-  return win.loadFile(join(__dirname, `../renderer/${page}/index.html`));
+  if (devUrl) {
+    const qs = new URLSearchParams(query).toString();
+    return win.loadURL(`${devUrl}/${page}/index.html${qs ? `?${qs}` : ''}`);
+  }
+  return win.loadFile(join(__dirname, `../renderer/${page}/index.html`), { query });
 }
 
 /** Окна не уходят никуда: ни навигации, ни новых окон. */

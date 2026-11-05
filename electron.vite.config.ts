@@ -21,6 +21,7 @@ export default defineConfig({
         input: {
           widget: resolve(__dirname, 'src/renderer/widget/index.html'),
           debug: resolve(__dirname, 'src/renderer/debug/index.html'),
+          overlay: resolve(__dirname, 'src/renderer/overlay/index.html'),
         },
       },
     },

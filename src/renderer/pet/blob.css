@@ -72,6 +72,42 @@
   animation: bounce 650ms cubic-bezier(0.3, 0.7, 0.4, 1);
 }
 
+/* ── Машет в preBreak (SPEC 3.2): правая лапка поднята и качается. ── */
+.pet .arm {
+  transform-box: view-box;
+}
+.pet.state-waving .arm-r {
+  transform-origin: 160px 126px;
+  animation: wave 0.7s ease-in-out infinite alternate;
+}
+
+/* ── Упражнения на оверлее (R0: 3 анимации P0). Только во время перерыва. ── */
+.pet.state-onBreak-lookFar .pupil {
+  animation: look-far 6s ease-in-out infinite;
+}
+.pet.state-onBreak-stretchUp .hop {
+  animation: stretch-up 4s ease-in-out infinite;
+}
+.pet.state-onBreak-stretchUp .arm {
+  transform-origin: 100px 130px;
+  animation: arms-up 4s ease-in-out infinite;
+}
+.pet.state-onBreak-stretchUp .arm-l {
+  animation-name: arms-up-l;
+}
+.pet.state-onBreak-breathe .hop {
+  /* вдох 4 с — выдох 6 с */
+  animation: deep-breath 10s ease-in-out infinite;
+}
+.pet.state-onBreak-breathe .eye {
+  transform: scaleY(0.12);
+}
+
+/* Радость после перерыва. */
+.pet .hop[data-reaction='celebrate'] {
+  animation: celebrate 1.5s cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
 /* Стадии роста. TODO День 5: разные пропорции и детали для teen/adult/wise. */
 .pet.stage-baby .stage-scale {
   transform: scale(0.86);
@@ -150,5 +186,86 @@
   100% {
     opacity: 0;
     transform: translate(6px, -10px);
+  }
+}
+
+@keyframes wave {
+  from {
+    transform: rotate(-150deg) translate(0, 0);
+  }
+  to {
+    transform: rotate(-110deg);
+  }
+}
+@keyframes look-far {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  30%,
+  70% {
+    transform: translate(-5px, -6px);
+  }
+}
+@keyframes stretch-up {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  45%,
+  60% {
+    transform: scale(0.92, 1.14);
+  }
+}
+@keyframes arms-up {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  45%,
+  60% {
+    transform: rotate(-60deg) translate(-8px, -30px);
+  }
+}
+@keyframes arms-up-l {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  45%,
+  60% {
+    transform: rotate(60deg) translate(8px, -30px);
+  }
+}
+@keyframes deep-breath {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  40% {
+    transform: scale(1.09, 1.06);
+  }
+}
+@keyframes celebrate {
+  0% {
+    transform: translateY(0) scale(1, 1) rotate(0);
+  }
+  15% {
+    transform: translateY(0) scale(1.15, 0.85);
+  }
+  35% {
+    transform: translateY(-34px) scale(0.92, 1.1) rotate(-8deg);
+  }
+  55% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+  70% {
+    transform: translateY(-18px) scale(0.96, 1.05) rotate(8deg);
+  }
+  85% {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+  100% {
+    transform: translateY(0) scale(1, 1) rotate(0);
   }
 }

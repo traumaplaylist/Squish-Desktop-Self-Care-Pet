@@ -45,6 +45,8 @@ jobs:
         run: node scripts/smoke.mjs
         env:
           SQUISH_EXE: dist/win-unpacked/Squish.exe
+      - name: E2E breaks (debug mode, real Windows overlay)
+        run: node scripts/e2e-breaks.mjs
       - name: Upload installer
         uses: actions/upload-artifact@v5
         with:
