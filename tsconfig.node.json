@@ -11,6 +11,6 @@
     "src/preload/**/*",
     "src/renderer/i18n/*.json",
     "electron.vite.config.ts",
-    "vitest.config.ts"
+    "vitest.config.mts"
   ]
 }
