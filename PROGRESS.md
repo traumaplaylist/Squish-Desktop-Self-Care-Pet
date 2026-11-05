@@ -17,6 +17,9 @@
 9. Ветка `claude/magical-brahmagupta-bo67sr`, сдача — PR в `main`, мёржит владелец.
 10. Внешний вид питомца — на усмотрение агента: круглый блоб, мятный `#9EE6CF`.
 
+## Решение владельца (2026-11-05): интерактив и среда
+Добавлено SPEC 4.10: без шкалы голода; тактильность (погладить/щекотка/потрясти) — P1 на День 5; угощения, «еда как отражение заботы», островок в виджете — Неделя 2; комната в «Доме питомца» — P2, Неделя 2–3.
+
 ## День 1 — сделано (2026-11-05)
 - **Каркас:** electron-vite 6 + vite 8 + React 18 + TS 5.9 strict, Vitest 5, ESLint 9 (flat) + Prettier. Скрипты: dev, dev:debug, build, test, test:watch, typecheck, lint, build:win, build:dir, smoke, icons, measure:idle.
 - **core/:** `clock.ts` (Clock, FakeClock, AcceleratedClock), `types.ts` (всё состояние SPEC 3–7 с R0), `events.ts` (события + эффекты), `defaults.ts`, `widgetPosition.ts` (позиция `{displayId,x,y}`, возврат в угол), `notificationState.ts` (коды QUNS по R0), `i18n.ts`, `ipc.ts` (типизированный контракт).
