@@ -1,0 +1,146 @@
+/* Общий вид окон-страниц: онбординг, настройки, «Дом питомца». */
+body {
+  background: var(--bg);
+  font-size: 13.5px;
+}
+.page {
+  padding: 18px 20px 24px;
+}
+h1 {
+  font-size: 19px;
+  margin: 0 0 12px;
+}
+h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 18px 0 8px;
+}
+.card {
+  background: var(--card);
+  border-radius: 14px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px rgba(46, 42, 61, 0.08);
+  margin-bottom: 10px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--chip);
+  border-radius: 12px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+.tabs button {
+  flex: 1;
+  font: inherit;
+  border: none;
+  border-radius: 10px;
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.tabs button.on {
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(46, 42, 61, 0.12);
+  font-weight: 600;
+}
+.btn {
+  font: inherit;
+  border: none;
+  border-radius: 12px;
+  padding: 8px 16px;
+  background: var(--chip);
+  color: var(--text);
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--accent);
+  color: #1d3b31;
+  font-weight: 600;
+}
+.btn.danger {
+  background: #f9e1df;
+  color: #9a3b32;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 34px;
+}
+.field + .field {
+  border-top: 1px solid var(--border);
+}
+.field label {
+  flex: 1;
+}
+.field .hint {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+input[type='text'],
+input[type='number'],
+input[type='time'],
+select {
+  font: inherit;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 5px 8px;
+  background: var(--card);
+  color: var(--text);
+  outline: none;
+}
+input[type='number'] {
+  width: 72px;
+}
+input:focus,
+select:focus {
+  border-color: var(--accent);
+}
+.seg {
+  display: inline-flex;
+  background: var(--chip);
+  border-radius: 10px;
+  padding: 2px;
+}
+.seg button {
+  font: inherit;
+  font-size: 12.5px;
+  border: none;
+  border-radius: 8px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+.seg button.on {
+  background: var(--card);
+  box-shadow: 0 1px 3px rgba(46, 42, 61, 0.12);
+}
+.muted {
+  color: var(--muted);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.chip {
+  font: inherit;
+  font-size: 12px;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: var(--chip);
+  color: var(--text);
+  cursor: pointer;
+}

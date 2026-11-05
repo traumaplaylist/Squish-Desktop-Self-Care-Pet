@@ -1,0 +1,68 @@
+.score {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.score .hint {
+  font-size: 11.5px;
+}
+.score-value {
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--accent-strong);
+}
+.chart-title {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.legend {
+  display: flex;
+  gap: 10px;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+.chart .axis,
+.chart .bar-val {
+  font-size: 10px;
+  fill: var(--muted);
+  text-anchor: middle;
+}
+.mood-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.moods {
+  display: flex;
+  gap: 14px;
+  font-size: 17px;
+}
+.pet-card {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+.pet-card > div:last-child {
+  flex: 1;
+}
+.pet-card .pet-host {
+  width: 150px;
+  height: 150px;
+  flex: none;
+}
+.pet-name {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}

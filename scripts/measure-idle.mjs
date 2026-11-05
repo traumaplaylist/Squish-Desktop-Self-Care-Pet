@@ -11,7 +11,11 @@ const exe = process.argv[2] ?? 'dist/linux-unpacked/squish';
 const app = await electron.launch({
   executablePath: exe,
   args: ['--no-sandbox'],
-  env: { ...process.env, SQUISH_USER_DATA: mkdtempSync(join(tmpdir(), 'squish-idle-')) },
+  env: {
+    ...process.env,
+    SQUISH_SKIP_ONBOARDING: '1',
+    SQUISH_USER_DATA: mkdtempSync(join(tmpdir(), 'squish-idle-')),
+  },
 });
 const pid = app.process().pid;
 const tree = () => [

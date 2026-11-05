@@ -278,6 +278,8 @@ export interface PersistedState {
   economy: EconomyState;
   scheduler: SchedulerState;
   water: import('./water').WaterState;
+  /** Активное время за логический день (для статистики). */
+  activity: { day: DayKey; activeMs: number };
   widget: { position: WidgetPosition | null; visible: boolean };
   onboardingDone: boolean;
   lastDayClosed: DayKey | null;
@@ -313,10 +315,31 @@ export interface TasksView {
   defaultSize: TaskSize;
 }
 
+/** «Дом питомца» (SPEC 2.3). */
+export interface HomeStats {
+  today: import('./stats').DayStats & {
+    score: number | null;
+    waterGoal: number;
+    energyGoal: number;
+  };
+  week: (import('./stats').DayStats & { score: number | null })[];
+  pet: {
+    name: string;
+    stage: GrowthStage;
+    palette: Palette;
+    careDays: number;
+    streak: number;
+    streakFreezes: number;
+    coins: number;
+  };
+}
+
 /** Снапшот, который main рассылает во все окна. */
 export interface Snapshot {
   debug: boolean;
   lang: Lang;
+  /** Тема окон по системной (nativeTheme). */
+  theme: 'light' | 'dark';
   pet: {
     name: string;
     palette: Palette;

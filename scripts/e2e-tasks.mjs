@@ -13,6 +13,7 @@ const app = await electron.launch({
   env: {
     ...process.env,
     SQUISH_DEBUG: '1',
+    SQUISH_SKIP_ONBOARDING: '1',
     SQUISH_USER_DATA: mkdtempSync(join(tmpdir(), 'squish-e2e-tasks-')),
   },
 });

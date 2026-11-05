@@ -16,7 +16,7 @@ export function secureWebPreferences(): BrowserWindowConstructorOptions['webPref
 /** Загрузить страницу renderer: dev-сервер или собранный файл. */
 export function loadPage(
   win: BrowserWindow,
-  page: 'widget' | 'debug' | 'overlay' | 'tasks',
+  page: 'widget' | 'debug' | 'overlay' | 'tasks' | 'onboarding' | 'settings' | 'home',
   query: Record<string, string> = {},
 ): Promise<void> {
   const devUrl = process.env['ELECTRON_RENDERER_URL'];

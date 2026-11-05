@@ -365,3 +365,27 @@ h1 {
   color: #3e8f72;
   cursor: default;
 }
+
+/* Тёмная тема */
+:root[data-theme='dark'] .card {
+  background: var(--card);
+  color: var(--text);
+}
+:root[data-theme='dark'] .quick-input,
+:root[data-theme='dark'] .check {
+  background: #1f1c29;
+  border-color: var(--border);
+  color: var(--text);
+}
+:root[data-theme='dark'] .chip,
+:root[data-theme='dark'] .mini,
+:root[data-theme='dark'] .size {
+  background: var(--chip);
+  color: var(--text);
+}
+:root[data-theme='dark'] .item:hover {
+  background: #332e42;
+}
+:root[data-theme='dark'] .first-aid {
+  background: var(--warm);
+}

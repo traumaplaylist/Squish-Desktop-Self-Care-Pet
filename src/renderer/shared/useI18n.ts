@@ -6,6 +6,11 @@ export function useI18n(): (key: string, params?: Record<string, string | number
   const [dict, setDict] = useState<Dict>({});
   useEffect(() => {
     void window.squish.invoke('app:getLangDict').then(setDict);
+    // Язык сменили в настройках — перечитать словарь без перезапуска (SPEC 2.4).
+    return window.squish.on(
+      'lang',
+      () => void window.squish.invoke('app:getLangDict').then(setDict),
+    );
   }, []);
   return (key, params) => translate(dict, key, params);
 }

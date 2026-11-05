@@ -1,6 +1,5 @@
 import { Menu, nativeImage, Tray, type MenuItemConstructorOptions } from 'electron';
 import trayIconPath from '../../resources/tray.png?asset';
-import { log } from './log';
 import { t } from './i18n';
 
 export interface TrayActions {
@@ -13,6 +12,8 @@ export interface TrayActions {
   resume(): void;
   toggleWidget(): void;
   openDebug(): void;
+  openHome(): void;
+  openSettings(): void;
   quit(): void;
   debug: boolean;
 }
@@ -28,9 +29,8 @@ let tray: Tray | null = null;
 let lastTooltip = '';
 let lastKey: string | null = null;
 
-/** Меню трея SPEC 2.6. Пункты будущих дней пока логируют. */
+/** Меню трея SPEC 2.6. */
 export function buildMenu(actions: TrayActions, state: TrayState): Menu {
-  const stub = (name: string) => () => log(`tray: «${name}» — пока заглушка`);
   const items: MenuItemConstructorOptions[] = [
     { label: t('tray.breakNow'), click: () => actions.breakNow() },
     { label: t('tray.water'), click: () => actions.water() },
@@ -60,8 +60,8 @@ export function buildMenu(actions: TrayActions, state: TrayState): Menu {
       click: () => actions.toggleHardDay(),
     },
     { type: 'separator' },
-    { label: t('tray.home'), click: stub('home') },
-    { label: t('tray.settings'), click: stub('settings') },
+    { label: t('tray.home'), click: () => actions.openHome() },
+    { label: t('tray.settings'), click: () => actions.openSettings() },
     { label: t('tray.toggleWidget'), click: () => actions.toggleWidget() },
   ];
   if (actions.debug) items.push({ label: t('tray.debug'), click: () => actions.openDebug() });
@@ -81,9 +81,9 @@ export function createTray(actions: TrayActions): Tray {
 }
 
 /** Меню пересобираем только при смене состояния (пауза, кто держит микрофон). */
-export function updateTray(actions: TrayActions, state: TrayState): void {
+export function updateTray(actions: TrayActions, state: TrayState, force = false): void {
   const key = `${state.paused}|${state.quietApp ?? ''}|${state.hardDay}`;
-  if (!tray || key === lastKey) return;
+  if (!tray || (key === lastKey && !force)) return;
   lastKey = key;
   tray.setContextMenu(buildMenu(actions, state));
 }

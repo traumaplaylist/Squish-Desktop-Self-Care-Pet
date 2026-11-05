@@ -1,5 +1,5 @@
 body {
-  background: #faf7f2;
+  background: var(--bg);
   padding: 16px;
   font-size: 13px;
 }
@@ -8,7 +8,7 @@ h1 {
   margin: 0 0 12px;
 }
 section {
-  background: #fff;
+  background: var(--card);
   border-radius: 12px;
   padding: 10px 12px;
   margin-bottom: 10px;

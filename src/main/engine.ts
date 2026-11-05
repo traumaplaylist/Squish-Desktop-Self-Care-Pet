@@ -19,6 +19,7 @@ import type {
   BreakKind,
   Bubble,
   BubbleAction,
+  HomeStats,
   PersistedState,
   Task,
   TaskItemView,
@@ -60,6 +61,7 @@ import {
   uncompleteTask,
   type TasksState,
 } from '../core/tasks';
+import { dayScore, lastDays, prevDayKey, statsByDay } from '../core/stats';
 import { selectVisual } from '../core/visual';
 import { drink, undoDrink, waterForDay, waterTick, type WaterConfig } from '../core/water';
 
@@ -81,6 +83,10 @@ export interface EngineDeps {
   onTasksChanged?: (v: TasksView) => void;
   /** Начался новый логический день (бэкап и т. п.). */
   onNewDay?: (day: string) => void;
+  /** Лог событий за текущий и прошлый месяц (для «Дома питомца»). */
+  readEvents?: () => AppEvent[];
+  /** Системная тема (nativeTheme). */
+  theme?: () => 'light' | 'dark';
   appendEvent: (e: AppEvent) => void;
   onEffects: (fx: Effect[]) => void;
   /** Debug: последние показания детекторов. */
@@ -177,6 +183,14 @@ export class Engine {
     // Закрыть прошлый день (и все пропущенные, если приложение было закрыто): серия, заморозки, рост.
     let pet = st.pet;
     if (wasDay) {
+      this.d.appendEvent({
+        type: 'day_closed',
+        at: now,
+        day: wasDay,
+        activeMs: st.activity.day === wasDay ? st.activity.activeMs : 0,
+        energy: pet.energyToday,
+        goalReached: pet.goalDay === wasDay || goalReached(pet),
+      });
       const r = catchUpDays(
         pet,
         { day: wasDay, goalReached: pet.goalDay === wasDay || goalReached(pet) },
@@ -197,6 +211,7 @@ export class Engine {
         economy: economyForDay(st.economy, day),
         pet: morningPet(pet),
         water: waterForDay(st.water, day),
+        activity: { day, activeMs: 0 },
       },
       0,
     );
@@ -224,9 +239,22 @@ export class Engine {
     );
     // Потребности убывают в активное время (R0: и на созвоне — человек у экрана).
     const needs = decayNeeds(st.pet.needs, activeDelta);
-    if (r.water !== st.water || needs !== st.pet.needs) {
+    const today = dayKey(now);
+    const activity =
+      activeDelta > 0 || st.activity.day !== today
+        ? {
+            day: today,
+            activeMs: (st.activity.day === today ? st.activity.activeMs : 0) + activeDelta,
+          }
+        : st.activity;
+    if (r.water !== st.water || needs !== st.pet.needs || activity !== st.activity) {
       this.d.setState(
-        { ...this.d.getState(), water: r.water, pet: { ...this.d.getState().pet, needs } },
+        {
+          ...this.d.getState(),
+          water: r.water,
+          activity,
+          pet: { ...this.d.getState().pet, needs },
+        },
         10_000,
       );
     }
@@ -529,6 +557,45 @@ export class Engine {
     this.d.onTasksChanged?.(this.tasksView());
   }
 
+  /** «Дом питомца»: сегодня и неделя из лога событий + текущее состояние. */
+  homeStats(): HomeStats {
+    const st = this.d.getState();
+    const settings = this.d.getSettings();
+    const now = this.d.clock.now();
+    const today = dayKey(now);
+    const byDay = statsByDay(this.d.readEvents?.() ?? [], dayKey);
+    const week = lastDays(byDay, today, prevDayKey);
+    const t = week[week.length - 1]!;
+    const energyGoal = dailyGoal(st.pet.hardDay);
+    const todayStats = {
+      ...t,
+      energy: st.pet.energyToday,
+      activeMs: st.activity.day === today ? st.activity.activeMs : 0,
+      goalReached: goalReached(st.pet),
+    };
+    return {
+      today: {
+        ...todayStats,
+        score: dayScore(todayStats, settings.water.goalGlasses, energyGoal),
+        waterGoal: settings.water.goalGlasses,
+        energyGoal,
+      },
+      week: week.map((d) => {
+        const x = d.day === today ? todayStats : d;
+        return { ...x, score: dayScore(x, settings.water.goalGlasses, dailyGoal(false)) };
+      }),
+      pet: {
+        name: st.pet.name,
+        stage: st.pet.stage,
+        palette: st.pet.palette,
+        careDays: st.pet.careDays,
+        streak: st.pet.streak,
+        streakFreezes: st.pet.streakFreezes,
+        coins: st.economy.coins,
+      },
+    };
+  }
+
   private firstAidView(): TasksView['firstAid'] {
     const st = this.d.getState();
     if (!st.pet.hardDay) return null;
@@ -787,6 +854,7 @@ export class Engine {
     return {
       debug: this.d.debug,
       lang: settings.lang,
+      theme: this.d.theme?.() ?? 'light',
       pet: {
         name: st.pet.name,
         palette: st.pet.palette,

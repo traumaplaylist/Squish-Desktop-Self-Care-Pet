@@ -1,6 +1,27 @@
+/* Единый стиль окон (SPEC/PROMPTS День 6): мягкий, тёплый, скругления, Segoe UI, светлая/тёмная тема. */
 :root {
   font-family: 'Segoe UI', system-ui, sans-serif;
-  color: #2e2a3d;
+  --bg: #faf7f2;
+  --card: #fffdf9;
+  --text: #2e2a3d;
+  --muted: #7a7299;
+  --border: #e6dff0;
+  --chip: #f1ecf8;
+  --accent: #9ee6cf;
+  --accent-strong: #6fcbaf;
+  --warm: #fff4ec;
+  color: var(--text);
+}
+:root[data-theme='dark'] {
+  --bg: #1f1c29;
+  --card: #2a2636;
+  --text: #ece8f5;
+  --muted: #a59fc0;
+  --border: #3d3850;
+  --chip: #37314a;
+  --accent: #5fb89c;
+  --accent-strong: #79d4b6;
+  --warm: #3a2e2b;
 }
 * {
   box-sizing: border-box;

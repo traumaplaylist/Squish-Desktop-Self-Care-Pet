@@ -16,7 +16,7 @@ const launch = process.env.SQUISH_EXE
   ? { executablePath: process.env.SQUISH_EXE, args }
   : { args: [...args, '.'] };
 
-const env = { ...process.env, SQUISH_USER_DATA: userData };
+const env = { ...process.env, SQUISH_USER_DATA: userData, SQUISH_SKIP_ONBOARDING: '1' };
 if (process.env.SMOKE_DEBUG === '1') env.SQUISH_DEBUG = '1';
 delete env.ELECTRON_RENDERER_URL;
 

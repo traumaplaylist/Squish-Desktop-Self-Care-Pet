@@ -8,10 +8,16 @@ import type {
   Palette,
   PetReaction,
   PetVisualState,
+  HomeStats,
+  Lang,
+  Palette as PaletteT,
+  Settings,
   Snapshot,
+  Strictness,
   SuppressReason,
   TasksView,
 } from './types';
+import type { SettingsPatch } from './settingsSchema';
 
 export interface ProbeResult {
   platform: string;
@@ -41,6 +47,19 @@ export interface MainEvents {
   'tasks:mode': { mode: 'quick' | 'panel'; t0: number };
   /** Виджет: монетки летят к питомцу. */
   'pet:coins': { count: number; surprise: boolean };
+  /** Язык сменился — перечитать словарь (SPEC 2.4: без перезапуска). */
+  lang: Lang;
+  /** Настройки изменились (окно настроек). */
+  settings: Settings;
+}
+
+export interface OnboardingResult {
+  name: string;
+  palette: PaletteT;
+  goalGlasses: number;
+  strictness: Strictness;
+  tasks: string[];
+  autostart: boolean;
 }
 
 /** renderer → main (fire-and-forget) */
@@ -73,6 +92,11 @@ export interface RendererCommands {
   /** Окно задач видно и поле в фокусе: t0 из 'tasks:mode' (замер). */
   'tasks:shown': number;
   'tasks:firstAid': string;
+  'app:open': 'home' | 'settings' | 'tasks';
+  'settings:update': SettingsPatch;
+  /** Сброс прогресса (окно уже дважды спросило). */
+  'settings:resetProgress': null;
+  'onboarding:finish': OnboardingResult;
   'debug:pet': 'careDay' | 'stageUp' | 'needsLow' | 'energy' | 'coins';
   'bubble:action': BubbleAction;
   'debug:setVisual': PetVisualState | null;
@@ -91,6 +115,11 @@ export interface RendererInvokes {
   'app:getLangDict': { args: null; result: Record<string, string> };
   'debug:probe': { args: null; result: ProbeResult };
   'tasks:get': { args: null; result: TasksView };
+  'home:get': { args: null; result: HomeStats };
+  'settings:get': {
+    args: null;
+    result: { settings: Settings; hotkeysFailed: string[]; version: string };
+  };
 }
 
 /*
@@ -122,6 +151,10 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'tasks:setMode': true,
   'tasks:shown': true,
   'tasks:firstAid': true,
+  'app:open': true,
+  'settings:update': true,
+  'settings:resetProgress': true,
+  'onboarding:finish': true,
   'debug:pet': true,
   'bubble:action': true,
   'debug:setVisual': true,
@@ -137,6 +170,8 @@ const INVOKES: Record<keyof RendererInvokes, true> = {
   'app:getLangDict': true,
   'debug:probe': true,
   'tasks:get': true,
+  'home:get': true,
+  'settings:get': true,
 };
 const EVENTS: Record<keyof MainEvents, true> = {
   snapshot: true,
@@ -148,6 +183,8 @@ const EVENTS: Record<keyof MainEvents, true> = {
   tasks: true,
   'tasks:mode': true,
   'pet:coins': true,
+  lang: true,
+  settings: true,
 };
 
 export const RENDERER_COMMANDS = Object.keys(COMMANDS) as (keyof RendererCommands)[];

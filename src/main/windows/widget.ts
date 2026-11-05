@@ -31,6 +31,8 @@ export interface WidgetController {
 export function createWidgetWindow(opts: {
   saved: WidgetPosition | null;
   hideFromCapture: boolean;
+  /** Не показывать сразу (первый запуск: сначала онбординг). */
+  startHidden?: boolean;
   onPositionChanged: (pos: WidgetPosition | null) => void;
 }): WidgetController {
   const rect = resolveWidgetRect(opts.saved, getDisplays(), WIDGET_SIZE);
@@ -54,7 +56,9 @@ export function createWidgetWindow(opts: {
   win.setAlwaysOnTop(true, 'floating');
   // SPEC 2.1: питомец не попадает в демонстрацию экрана (Win10 2004+: WDA_EXCLUDEFROMCAPTURE).
   win.setContentProtection(opts.hideFromCapture);
-  win.once('ready-to-show', () => win.showInactive());
+  win.once('ready-to-show', () => {
+    if (!opts.startHidden) win.showInactive();
+  });
   void loadPage(win, 'widget');
 
   // Прозрачные области пропускают клики на рабочий стол (только Windows/macOS поддерживают forward).

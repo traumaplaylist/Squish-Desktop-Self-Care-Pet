@@ -83,6 +83,7 @@ export function defaultState(now: number): PersistedState {
       naturalCounted: false,
     },
     water: defaultWater(),
+    activity: { day: '', activeMs: 0 },
     widget: { position: null, visible: true },
     onboardingDone: false,
     lastDayClosed: null,

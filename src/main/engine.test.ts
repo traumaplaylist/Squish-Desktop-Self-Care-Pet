@@ -347,4 +347,25 @@ describe('Engine', () => {
     }
     expect(said).toBe(true);
   });
+  it('итог дня: day_closed с активным временем и энергией; «Дом питомца» видит сегодня и неделю', () => {
+    const t = setup();
+    t.step(2 * SECOND);
+    t.engine.answerCheckin(4);
+    t.step(5 * MINUTE);
+    const home = t.engine.homeStats();
+    expect(home.today.mood).toBe(null); // событий в тестовом логе нет — mood берётся из лога
+    expect(home.today.energy).toBe(2);
+    expect(home.today.activeMs).toBeGreaterThan(4 * MINUTE);
+    expect(home.week).toHaveLength(7);
+    t.clock.set(new Date(2026, 10, 6, 6, 0, 1).getTime());
+    t.engine.tick();
+    const closed = t.events.find((e) => e.type === 'day_closed');
+    expect(closed).toMatchObject({
+      type: 'day_closed',
+      day: '2026-11-05',
+      energy: 2,
+      goalReached: false,
+    });
+    expect((closed as { activeMs: number }).activeMs).toBeGreaterThan(4 * MINUTE);
+  });
 });

@@ -51,6 +51,8 @@ jobs:
         run: node scripts/e2e-tasks.mjs
       - name: E2E pet (check-in, hard day, first aid, needs, stages, petting)
         run: node scripts/e2e-pet.mjs
+      - name: E2E onboarding, settings (live), pet's home
+        run: node scripts/e2e-onboarding.mjs
       - name: Upload installer
         uses: actions/upload-artifact@v5
         with:

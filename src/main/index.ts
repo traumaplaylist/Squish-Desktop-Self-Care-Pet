@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { basename, join } from 'node:path';
-import { app, BrowserWindow, ipcMain, Menu, powerMonitor, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, powerMonitor, screen } from 'electron';
 import { AcceleratedClock, type Clock } from '../core/clock';
 import { formatTimeOfDay, nextDayBoundary } from '../core/day';
 import { dayKey } from '../core/day';
@@ -11,6 +11,8 @@ import { classifyNotificationState } from '../core/notificationState';
 import type { PersistedState, PersistedTasks, Settings, Snapshot } from '../core/types';
 import { Engine } from './engine';
 import { getDict, setLang, t } from './i18n';
+import { validateSettings } from '../core/settingsSchema';
+import { closePage, openPage, retitlePages } from './windows/pages';
 import { log } from './log';
 import { RealClock } from './realClock';
 import { getKoffiError, loadKoffi, queryUserNotificationState } from './smartPause/fullscreen';
@@ -117,7 +119,17 @@ async function main(): Promise<void> {
   const events = new EventLog(dataDir);
   const backup = (day: string) => dailyBackup(dataDir, ['settings', 'state', 'tasks'], day, 7, log);
   backup(dayKey(clock.now()));
+  // Настройки из файла проходят проверку (SPEC 2.4): мусор → значения по умолчанию, без падения.
+  {
+    const checked = validateSettings(settingsStore.get());
+    if (JSON.stringify(checked) !== JSON.stringify(settingsStore.get()))
+      settingsStore.set(checked, 0);
+  }
   setLang(settingsStore.get().lang);
+  const SKIP_ONBOARDING = process.env['SQUISH_SKIP_ONBOARDING'] === '1';
+  if (SKIP_ONBOARDING && !stateStore.get().onboardingDone) {
+    stateStore.set({ ...stateStore.get(), onboardingDone: true }, 0);
+  }
 
   await app.whenReady();
   Menu.setApplicationMenu(null);
@@ -157,6 +169,7 @@ async function main(): Promise<void> {
     createWidgetWindow({
       saved: stateStore.get().widget.position,
       hideFromCapture: settingsStore.get().general.hideFromCapture,
+      startHidden: !stateStore.get().onboardingDone,
       onPositionChanged: savePosition,
     });
   let widget: WidgetController = makeWidget();
@@ -224,6 +237,13 @@ async function main(): Promise<void> {
       if (!tasksWin.win.isDestroyed()) tasksWin.win.webContents.send('tasks', v);
     },
     onNewDay: (day) => backup(day),
+    readEvents: () => {
+      const now = real.now();
+      const d = new Date(now);
+      const prev = new Date(d.getFullYear(), d.getMonth() - 1, 15).getTime();
+      return [...events.readMonth(prev), ...events.readMonth(now)];
+    },
+    theme: () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'),
     appendEvent: (e) => events.append(e),
     onEffects: runEffects,
     getDetectorReadings: () => {
@@ -254,6 +274,8 @@ async function main(): Promise<void> {
     anchor: () => widget.win.getBounds(),
   });
   (globalThis as Record<string, unknown>)['__squishTasksLatency'] = () => tasksWin.lastLatencyMs;
+  // Для e2e: открыть окно как из трея (меню трея в Xvfb не нажать).
+  (globalThis as Record<string, unknown>)['__squishOpen'] = (p: 'home' | 'settings') => openPage(p);
   // Для e2e: показать окно задач так же, как хоткей Ctrl+Alt+T (хоткей в Xvfb не нажать).
   (globalThis as Record<string, unknown>)['__squishShowTasks'] = (m: 'quick' | 'panel') =>
     tasksWin.show(m);
@@ -316,6 +338,8 @@ async function main(): Promise<void> {
     resume: () => engine.dispatch({ type: 'resume' }),
     toggleWidget,
     openDebug: openDebugWindow,
+    openHome: () => openPage('home'),
+    openSettings: () => openPage('settings'),
     quit,
     debug: DEBUG,
   };
@@ -351,13 +375,58 @@ async function main(): Promise<void> {
   if (DEBUG) openDebugWindow();
 
   // ── Хоткеи (SPEC 7.5): занято → не падаем, список — в снапшоте ──
-  const failed = registerHotkeys(settingsStore.get().hotkeys, {
-    quickTask: () => tasksWin.toggle('quick'),
-    water: () => engine.drinkWater(),
-    breakNow: () => engine.breakNowAuto(),
-    toggleWidget,
-  });
-  engine.setHotkeysFailed(failed);
+  const applyHotkeys = () =>
+    engine.setHotkeysFailed(
+      registerHotkeys(settingsStore.get().hotkeys, {
+        quickTask: () => tasksWin.toggle('quick'),
+        water: () => engine.drinkWater(),
+        breakNow: () => engine.breakNowAuto(),
+        toggleWidget,
+      }),
+    );
+  applyHotkeys();
+
+  // ── Автозапуск (SPEC 7.5) — только для собранного приложения на Windows ──
+  const applyAutostart = () => {
+    if (process.platform !== 'win32' || !app.isPackaged) return;
+    app.setLoginItemSettings({
+      openAtLogin: settingsStore.get().general.autostart,
+      args: ['--hidden'],
+    });
+  };
+  applyAutostart();
+
+  /** Применить новые настройки без перезапуска (SPEC 2.4). */
+  const updateSettings = (patch: unknown) => {
+    const prev = settingsStore.get();
+    const next = validateSettings(patch, prev);
+    settingsStore.set(next, 0);
+    if (next.lang !== prev.lang) {
+      setLang(next.lang);
+      retitlePages();
+      for (const w of BrowserWindow.getAllWindows())
+        if (!w.isDestroyed()) w.webContents.send('lang', next.lang);
+      updateTray(
+        trayActions,
+        { paused: false, quietApp: null, hardDay: stateStore.get().pet.hardDay },
+        true,
+      );
+    }
+    if (next.general.hideFromCapture !== prev.general.hideFromCapture) {
+      widget.setContentProtection(next.general.hideFromCapture);
+      tasksWin.setContentProtection(next.general.hideFromCapture);
+    }
+    if (JSON.stringify(next.hotkeys) !== JSON.stringify(prev.hotkeys)) applyHotkeys();
+    if (next.general.autostart !== prev.general.autostart) applyAutostart();
+    for (const w of BrowserWindow.getAllWindows())
+      if (!w.isDestroyed()) w.webContents.send('settings', next);
+    tasksWin.win.webContents.send('tasks', engine.tasksView());
+    publish();
+  };
+
+  // ── Первый запуск: онбординг вместо виджета (SPEC 2.5) ──
+  if (!stateStore.get().onboardingDone) openPage('onboarding');
+  nativeTheme.on('updated', () => publish());
 
   // ── Tick раз в секунду (реального времени) ──
   const tickTimer = setInterval(() => {
@@ -440,6 +509,52 @@ async function main(): Promise<void> {
   on('tasks:setMode', (m) => (m === 'quick' || m === 'panel') && tasksWin.setMode(m));
   on('tasks:shown', (t0) => tasksWin.shown(t0));
   taskCmd('tasks:firstAid', (id) => typeof id === 'string' && engine.firstAid(id));
+  handle('home:get', () => engine.homeStats());
+  handle('settings:get', () => ({
+    settings: settingsStore.get(),
+    hotkeysFailed: engine.snapshot().hotkeysFailed,
+    version: VERSION,
+  }));
+  on('app:open', (w) => {
+    if (w === 'home' || w === 'settings') openPage(w);
+    else if (w === 'tasks') tasksWin.show('panel');
+  });
+  on('settings:update', (patch) => updateSettings(patch));
+  on('settings:resetProgress', () => {
+    // Прогресс — питомец, экономика, задачи. Настройки и позиция виджета остаются.
+    const keep = stateStore.get();
+    stateStore.set({ ...defaultState(clock.now()), widget: keep.widget, onboardingDone: false }, 0);
+    tasksStore.set(defaultTasks(), 0);
+    log('сброс прогресса по запросу пользователя → перезапуск');
+    quitting = true;
+    app.relaunch();
+    app.exit(0);
+  });
+  on('onboarding:finish', (r) => {
+    if (!r || typeof r.name !== 'string') return;
+    const st = stateStore.get();
+    const palette = ['mint', 'peach', 'lavender'].includes(r.palette) ? r.palette : 'mint';
+    stateStore.set(
+      {
+        ...st,
+        onboardingDone: true,
+        pet: { ...st.pet, name: r.name.trim().slice(0, 24) || st.pet.name, palette, stage: 'baby' },
+      },
+      0,
+    );
+    updateSettings({
+      water: { goalGlasses: r.goalGlasses },
+      breaks: { strictness: r.strictness },
+      general: { autostart: r.autostart === true },
+    });
+    for (const text of Array.isArray(r.tasks) ? r.tasks.slice(0, 3) : []) {
+      if (typeof text === 'string') engine.createTaskFromText(text);
+    }
+    closePage('onboarding');
+    widget.win.showInactive();
+    widget.win.webContents.send('pet:play', 'celebrate');
+    publish();
+  });
   on('debug:pet', (cmd) => {
     if (!DEBUG || !['careDay', 'stageUp', 'needsLow', 'energy', 'coins'].includes(cmd)) return;
     engine.debugPet(cmd);
