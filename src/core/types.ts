@@ -38,6 +38,9 @@ export interface SchedulerState {
   phaseStartedAt: Millis;
   /** Когда закончится текущий перерыв (onBreak). */
   breakEndsAt: Millis | null;
+  /** Упражнение текущего перерыва и предыдущего (без повторов подряд). */
+  exerciseId: string | null;
+  lastExerciseId: string | null;
   /** Отложений подряд (сбрасывается после completed/skipped/natural, R0). */
   postponesInRow: number;
   /** Конец ручной паузы. */
@@ -50,7 +53,12 @@ export interface SchedulerState {
   } | null;
   /** Перерыв, наступивший во время подавления, — придёт через кулдаун. */
   dueBreak: { kind: BreakKind; dueSince: Millis } | null;
-  lastExerciseId: string | null;
+  /** После снятия подавления перерывы не начинаются до этого момента. */
+  cooldownUntil: Millis | null;
+  /** Время прошлого tick — для подсчёта активного времени. null = после старта/сна. */
+  lastTickAt: Millis | null;
+  /** Текущий отрезок простоя уже засчитан как естественный перерыв. */
+  naturalCounted: boolean;
 }
 
 export interface Exercise {

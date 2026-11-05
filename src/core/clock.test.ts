@@ -33,6 +33,17 @@ describe('AcceleratedClock', () => {
     base.advance(100);
     expect(c.now()).toBe(105);
   });
+  it('setFactor без скачка времени', () => {
+    const base = new FakeClock(0);
+    const c = new AcceleratedClock(base, 60);
+    base.advance(1000);
+    expect(c.now()).toBe(60_000);
+    c.setFactor(1);
+    expect(c.now()).toBe(60_000);
+    base.advance(1000);
+    expect(c.now()).toBe(61_000);
+    expect(c.getFactor()).toBe(1);
+  });
   it('factor ≤ 0 запрещён', () => {
     expect(() => new AcceleratedClock(new FakeClock(), 0)).toThrow();
   });

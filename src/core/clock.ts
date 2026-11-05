@@ -33,18 +33,33 @@ export class FakeClock implements Clock {
  * now() = origin + (base.now() - origin) * factor
  */
 export class AcceleratedClock implements Clock {
-  private readonly origin: number;
+  /** Точка отсчёта: в момент baseAt реального времени ускоренное время было virtualAt. */
+  private baseAt: number;
+  private virtualAt: number;
 
   constructor(
     private readonly base: Clock,
-    private readonly factor: number,
+    private factor: number,
   ) {
     if (!(factor > 0)) throw new Error('AcceleratedClock: factor должен быть > 0');
-    this.origin = base.now();
+    this.baseAt = base.now();
+    this.virtualAt = this.baseAt;
   }
 
   now(): number {
-    return this.origin + (this.base.now() - this.origin) * this.factor;
+    return this.virtualAt + (this.base.now() - this.baseAt) * this.factor;
+  }
+
+  getFactor(): number {
+    return this.factor;
+  }
+
+  /** Сменить ускорение без скачка времени (Debug: ×1 / ×10 / ×60). */
+  setFactor(factor: number): void {
+    if (!(factor > 0)) throw new Error('AcceleratedClock: factor должен быть > 0');
+    this.virtualAt = this.now();
+    this.baseAt = this.base.now();
+    this.factor = factor;
   }
 }
 

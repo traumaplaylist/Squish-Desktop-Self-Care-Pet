@@ -45,9 +45,12 @@ export type AppEventType = AppEvent['type'];
 /** Эффекты, которые core возвращает, а main исполняет. */
 export type Effect =
   | { type: 'log'; event: AppEvent }
-  | { type: 'showOverlay'; kind: BreakKind; exerciseId: string; endsAt: number }
+  /** Создать окна оверлея заранее, скрытыми (R0: в начале preBreak). */
   | { type: 'prepareOverlay' }
+  | { type: 'showOverlay'; kind: BreakKind; exerciseId: string; endsAt: number }
   | { type: 'hideOverlay' }
+  /** Перерыв закончился: completed — досидел, иначе пропуск/прерывание. Для наград и радости питомца. */
+  | { type: 'breakFinished'; kind: BreakKind; completed: boolean }
   | { type: 'petReaction'; reaction: import('./types').PetReaction }
   | { type: 'bubble'; textKey: string; params?: Record<string, string | number>; ttlMs: number }
   | { type: 'save' };
