@@ -22,6 +22,11 @@ export default tseslint.config(
         console: 'readonly',
         setTimeout: 'readonly',
         __dirname: 'readonly',
+        // код внутри page.evaluate() выполняется в окне Electron
+        window: 'readonly',
+        document: 'readonly',
+        performance: 'readonly',
+        MutationObserver: 'readonly',
       },
     },
   },
