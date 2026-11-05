@@ -37,7 +37,8 @@ function renameWithRetry(from: string, to: string): void {
       return;
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
-      if (i >= RENAME_RETRIES || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) throw e;
+      if (i >= RENAME_RETRIES || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES'))
+        throw e;
       const until = Date.now() + 20 * (i + 1);
       while (Date.now() < until) {
         /* короткое ожидание, синхронно — запись маленькая и редкая */
@@ -117,7 +118,12 @@ export class JsonStore<T> {
     }
     try {
       const env = JSON.parse(raw) as Partial<Envelope>;
-      if (typeof env !== 'object' || env === null || typeof env.schemaVersion !== 'number' || !('data' in env)) {
+      if (
+        typeof env !== 'object' ||
+        env === null ||
+        typeof env.schemaVersion !== 'number' ||
+        !('data' in env)
+      ) {
         throw new Error('нет schemaVersion/data');
       }
       if (env.schemaVersion > this.opts.version) {
@@ -145,7 +151,9 @@ export class JsonStore<T> {
       } catch {
         /* даже если не смогли переименовать — не падаем */
       }
-      this.opts.log?.(`storage: ${this.opts.name}.json повреждён (${(e as Error).message}) → ${path.basename(broken)}`);
+      this.opts.log?.(
+        `storage: ${this.opts.name}.json повреждён (${(e as Error).message}) → ${path.basename(broken)}`,
+      );
       this.lastLoad = 'broken';
       return this.opts.defaults();
     }
@@ -168,7 +176,11 @@ export class EventLog {
 
   append(event: AppEvent): void {
     fs.mkdirSync(this.dir, { recursive: true });
-    fs.appendFileSync(path.join(this.dir, eventFileName(event.at)), `${JSON.stringify(event)}\n`, 'utf8');
+    fs.appendFileSync(
+      path.join(this.dir, eventFileName(event.at)),
+      `${JSON.stringify(event)}\n`,
+      'utf8',
+    );
   }
 
   /** Все события месяца; битые строки пропускаются (обрыв при краше). */

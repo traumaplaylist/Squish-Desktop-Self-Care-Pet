@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint · typecheck · tests (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  windows:
+    name: Windows — тесты, установщик, смоук
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build NSIS installer
+        run: npm run build:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      - name: Smoke test (packaged app, koffi, SHQueryUserNotificationState)
+        run: node scripts/smoke.mjs
+        env:
+          SQUISH_EXE: dist/win-unpacked/Squish.exe
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Squish-Setup
+          path: dist/Squish-Setup-*.exe
+          if-no-files-found: error
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-windows
+          path: smoke-artifacts/

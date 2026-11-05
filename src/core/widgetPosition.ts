@@ -3,7 +3,10 @@ import type { DisplayInfo, Rect, WidgetPosition } from './types';
 export const WIDGET_MARGIN = 16;
 
 /** Правый нижний угол workArea основного монитора (над панелью задач). */
-export function defaultWidgetRect(displays: DisplayInfo[], size: { width: number; height: number }): Rect {
+export function defaultWidgetRect(
+  displays: DisplayInfo[],
+  size: { width: number; height: number },
+): Rect {
   const primary = displays.find((d) => d.primary) ?? displays[0];
   if (!primary) return { x: 0, y: 0, ...size };
   const wa = primary.workArea;

@@ -7,6 +7,25 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
+    files: ['scripts/**/*.mjs', '*.config.*'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        setTimeout: 'readonly',
+        __dirname: 'readonly',
+      },
+    },
+  },
+  {
     files: ['src/renderer/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: {
@@ -25,9 +44,18 @@ export default tseslint.config(
       ],
       'no-restricted-syntax': [
         'error',
-        { selector: "MemberExpression[object.name='Date'][property.name='now']", message: 'Только через Clock.' },
-        { selector: "NewExpression[callee.name='Date'][arguments.length=0]", message: 'Только через Clock.' },
-        { selector: "CallExpression[callee.name=/^(setTimeout|setInterval)$/]", message: 'Таймеры — в main, core получает tick(now).' },
+        {
+          selector: "MemberExpression[object.name='Date'][property.name='now']",
+          message: 'Только через Clock.',
+        },
+        {
+          selector: "NewExpression[callee.name='Date'][arguments.length=0]",
+          message: 'Только через Clock.',
+        },
+        {
+          selector: 'CallExpression[callee.name=/^(setTimeout|setInterval)$/]',
+          message: 'Таймеры — в main, core получает tick(now).',
+        },
       ],
     },
   },

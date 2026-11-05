@@ -1,0 +1,38 @@
+publish: null
+appId: com.squish.app
+productName: Squish
+copyright: Copyright © 2026 traumaplaylist
+directories:
+  output: dist
+  buildResources: resources
+files:
+  - out/**
+  - resources/**
+  - package.json
+  - '!**/*.map'
+# koffi 3: нативный код лежит в @koromix/koffi-<платформа>; .node из asar не грузится.
+asarUnpack:
+  - '**/*.node'
+  - node_modules/@koromix/**
+# koffi — N-API с готовыми бинарниками, пересобирать под Electron не нужно (и нельзя без Build Tools).
+npmRebuild: false
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: resources/icon.png
+  executableName: Squish
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Squish
+  uninstallDisplayName: Squish
+  deleteAppDataOnUninstall: false
+  artifactName: Squish-Setup-${version}.exe
+linux:
+  # Только для локальной проверки упаковки в облачном Linux; релизов под Linux нет.
+  target: dir
+  executableName: squish

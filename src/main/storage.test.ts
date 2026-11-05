@@ -79,14 +79,20 @@ describe('JsonStore', () => {
   });
 
   it('файл из будущей версии не затираем молча → broken + дефолты', () => {
-    fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ schemaVersion: 7, data: { n: 1 } }));
+    fs.writeFileSync(
+      path.join(dir, 'state.json'),
+      JSON.stringify({ schemaVersion: 7, data: { n: 1 } }),
+    );
     const s = make();
     expect(s.lastLoad).toBe('broken');
     expect(fs.existsSync(path.join(dir, 'state.broken-1234.json'))).toBe(true);
   });
 
   it('миграция v1 → v2 применяется и сохраняется', () => {
-    fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ schemaVersion: 1, data: { count: 4 } }));
+    fs.writeFileSync(
+      path.join(dir, 'state.json'),
+      JSON.stringify({ schemaVersion: 1, data: { count: 4 } }),
+    );
     const s = make({
       version: 2,
       migrations: { 1: (d) => ({ n: (d as { count: number }).count }) },
@@ -139,7 +145,9 @@ describe('EventLog', () => {
     log.append({ type: 'app_start', at, version: '0.1.0' });
     log.append({ type: 'water', at: at + 1, glasses: 1 });
     expect(log.readMonth(at).map((e) => e.type)).toEqual(['app_start', 'water']);
-    expect(fs.readFileSync(path.join(dir, 'events', '2026-11.jsonl'), 'utf8').split('\n')).toHaveLength(3);
+    expect(
+      fs.readFileSync(path.join(dir, 'events', '2026-11.jsonl'), 'utf8').split('\n'),
+    ).toHaveLength(3);
   });
 
   it('битая последняя строка (обрыв при краше) пропускается', () => {

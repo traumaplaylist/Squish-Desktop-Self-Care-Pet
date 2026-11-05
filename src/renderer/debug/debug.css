@@ -1,0 +1,49 @@
+body {
+  background: #faf7f2;
+  padding: 16px;
+  font-size: 13px;
+}
+h1 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 3px rgba(46, 42, 61, 0.08);
+}
+h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7a7299;
+  margin: 0 0 8px;
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+button {
+  font: inherit;
+  border: 1px solid #e3dcef;
+  background: #f6f2fb;
+  border-radius: 8px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+button.on {
+  background: #9ee6cf;
+  border-color: #6fcbaf;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 12px;
+}

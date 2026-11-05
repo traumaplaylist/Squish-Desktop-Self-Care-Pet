@@ -1,0 +1,11 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  color: #2e2a3d;
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+}

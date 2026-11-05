@@ -21,7 +21,10 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "build:win": "electron-vite build && electron-builder --win nsis --x64",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "measure:idle": "node scripts/measure-idle.mjs",
+    "build:dir": "electron-vite build && electron-builder --linux dir"
   },
   "dependencies": {
     "koffi": "^3.3.7"

@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import type { DisplayInfo } from './types';
-import { defaultWidgetRect, resolveWidgetRect, toWidgetPosition, WIDGET_MARGIN } from './widgetPosition';
+import {
+  defaultWidgetRect,
+  resolveWidgetRect,
+  toWidgetPosition,
+  WIDGET_MARGIN,
+} from './widgetPosition';
 
 const size = { width: 220, height: 260 };
-const primary: DisplayInfo = { id: 1, primary: true, workArea: { x: 0, y: 0, width: 1920, height: 1040 } };
-const right: DisplayInfo = { id: 2, primary: false, workArea: { x: 1920, y: 0, width: 2560, height: 1400 } };
+const primary: DisplayInfo = {
+  id: 1,
+  primary: true,
+  workArea: { x: 0, y: 0, width: 1920, height: 1040 },
+};
+const right: DisplayInfo = {
+  id: 2,
+  primary: false,
+  workArea: { x: 1920, y: 0, width: 2560, height: 1400 },
+};
 
 describe('widgetPosition', () => {
   it('по умолчанию — правый нижний угол основного монитора с отступом', () => {
@@ -34,12 +47,20 @@ describe('widgetPosition', () => {
     expect(r.x).toBe(1850);
   });
   it('монитор слева с отрицательными координатами', () => {
-    const left: DisplayInfo = { id: 3, primary: false, workArea: { x: -1280, y: 0, width: 1280, height: 984 } };
+    const left: DisplayInfo = {
+      id: 3,
+      primary: false,
+      workArea: { x: -1280, y: 0, width: 1280, height: 984 },
+    };
     const r = resolveWidgetRect({ displayId: 3, x: 10, y: 10 }, [primary, left], size);
     expect(r).toEqual({ x: -1270, y: 10, ...size });
   });
   it('toWidgetPosition выбирает монитор по центру окна', () => {
-    expect(toWidgetPosition({ x: 2020, y: 200, ...size }, [primary, right])).toEqual({ displayId: 2, x: 100, y: 200 });
+    expect(toWidgetPosition({ x: 2020, y: 200, ...size }, [primary, right])).toEqual({
+      displayId: 2,
+      x: 100,
+      y: 200,
+    });
   });
   it('toWidgetPosition: центр вне всех мониторов → монитор с наибольшим перекрытием', () => {
     const p = toWidgetPosition({ x: -150, y: 100, ...size }, [primary]);

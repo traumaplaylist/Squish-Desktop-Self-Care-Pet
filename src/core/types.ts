@@ -26,13 +26,7 @@ export type SchedulerPhase =
   | 'offHours';
 
 export type SuppressReason =
-  | 'fullscreen'
-  | 'game'
-  | 'presentation'
-  | 'mic'
-  | 'camera'
-  | 'capture'
-  | 'app';
+  'fullscreen' | 'game' | 'presentation' | 'mic' | 'camera' | 'capture' | 'app';
 
 export interface SchedulerState {
   phase: SchedulerPhase;
@@ -67,13 +61,7 @@ export interface Exercise {
   petAnimation: PetAnimation;
 }
 
-export type PetAnimation =
-  | 'lookFar'
-  | 'stretchUp'
-  | 'breathe'
-  | 'neckRoll'
-  | 'walk'
-  | 'drinkWater';
+export type PetAnimation = 'lookFar' | 'stretchUp' | 'breathe' | 'neckRoll' | 'walk' | 'drinkWater';
 
 // ───────────── Питомец (SPEC 4, 7) ─────────────
 export type GrowthStage = 'egg' | 'baby' | 'teen' | 'adult' | 'wise';
@@ -91,13 +79,7 @@ export type PetVisualState =
   | `onBreak:${PetAnimation}`;
 
 export type PetReaction =
-  | 'bounce'
-  | 'drink'
-  | 'celebrate'
-  | 'coinCatch'
-  | 'blink'
-  | 'straighten'
-  | 'hug';
+  'bounce' | 'drink' | 'celebrate' | 'coinCatch' | 'blink' | 'straighten' | 'hug';
 
 export type AccessoryId = string;
 export type MicroPetId = string;
@@ -133,10 +115,7 @@ export type TaskSize = 'S' | 'M' | 'L';
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = воскресенье
 
 export type Recurrence =
-  | { kind: 'none' }
-  | { kind: 'daily' }
-  | { kind: 'weekdays' }
-  | { kind: 'days'; days: Weekday[] };
+  { kind: 'none' } | { kind: 'daily' } | { kind: 'weekdays' } | { kind: 'days'; days: Weekday[] };
 
 export interface Task {
   id: string;
