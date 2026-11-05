@@ -35,6 +35,8 @@ export type AppEvent =
   | Base<'hard_day_off'>
   | Base<'streak_freeze_used'>
   | Base<'streak_restored'>
+  /** Итог логического дня (для «Недели» и активного времени). */
+  | (Base<'day_closed'> & { day: string; activeMs: number; energy: number; goalReached: boolean })
   | (Base<'app_start'> & { version: string })
   | Base<'app_quit'>
   | (Base<'suppressed_start'> & { reason: SuppressReason; app: string | null })
