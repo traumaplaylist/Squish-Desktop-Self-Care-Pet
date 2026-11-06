@@ -4,6 +4,7 @@
  */
 import { HOUR, MINUTE } from './clock';
 import { dailyGoal } from './economy';
+import { giveEgg, hatchEggs } from './microPets';
 import type { AppEvent } from './events';
 import type { BreakKind, DayKey, GrowthStage, Needs, PetState, Weekday, WorkHours } from './types';
 
@@ -114,22 +115,37 @@ export function closeDay(
   at: number,
 ): { pet: PetState; events: AppEvent[] } {
   const events: AppEvent[] = [];
-  let { careDays, streak, streakFreezes } = p;
+  let { careDays, streak, streakFreezes, streakRestore } = p;
+  let weekEgg = false;
   if (r.goalReached) {
     careDays += 1;
     streak += 1;
-    if (streak % FREEZE_EVERY_DAYS === 0) streakFreezes = Math.min(MAX_FREEZES, streakFreezes + 1);
+    if (streak % FREEZE_EVERY_DAYS === 0) {
+      streakFreezes = Math.min(MAX_FREEZES, streakFreezes + 1);
+      weekEgg = true; // SPEC 4.8: яйцо за 7 дней серии
+    }
   } else if (r.workingDay && streak > 0) {
     if (streakFreezes > 0) {
       streakFreezes -= 1;
       events.push({ type: 'streak_freeze_used', at });
     } else {
+      // SPEC 4.3 (P1): серию можно вернуть в течение 48 ч «днём-догонялкой».
+      streakRestore = { lost: streak, until: at + RESTORE_WINDOW_MS };
       streak = 0;
     }
   }
+  if (streakRestore && at > streakRestore.until) streakRestore = null;
   const stage = p.stage === 'egg' ? 'egg' : stageFor(careDays);
   if (stage !== p.stage) events.push({ type: 'stage_up', at, stage });
-  return { pet: { ...p, careDays, streak, streakFreezes, stage }, events };
+  let pet: PetState = { ...p, careDays, streak, streakFreezes, stage, streakRestore };
+  if (weekEgg) {
+    pet = giveEgg(pet, 'streak', at, `streak:${r.day}`);
+    events.push({ type: 'egg_received', at, source: 'streak' });
+  }
+  const h = hatchEggs(pet, at);
+  pet = h.pet;
+  h.hatched.forEach((id) => events.push({ type: 'egg_hatched', at, microPetId: id }));
+  return { pet, events };
 }
 
 /**
@@ -159,6 +175,24 @@ export function catchUpDays(
     reached = false;
   }
   return { pet, events, closed };
+}
+
+// ───────────── Восстановление серии (SPEC 4.3, P1) ─────────────
+export const RESTORE_WINDOW_MS = 48 * HOUR;
+export const RESTORE_FACTOR = 1.5;
+
+/** Цель «дня-догонялки»: цель дня ×1,5. */
+export function restoreGoal(hardDay: boolean): number {
+  return Math.ceil(dailyGoal(hardDay) * RESTORE_FACTOR);
+}
+
+/** Набрал цель догонялки, пока окно открыто → серия возвращается. Без монет и без оплаты. */
+export function tryRestoreStreak(p: PetState, now: number): { pet: PetState; restored: boolean } {
+  const r = p.streakRestore;
+  if (!r) return { pet: p, restored: false };
+  if (now > r.until) return { pet: { ...p, streakRestore: null }, restored: false };
+  if (p.energyToday < restoreGoal(p.hardDay)) return { pet: p, restored: false };
+  return { pet: { ...p, streak: r.lost + p.streak, streakRestore: null }, restored: true };
 }
 
 /** Новый день для потребностей и дневных полей. */

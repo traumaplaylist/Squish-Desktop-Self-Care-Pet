@@ -127,7 +127,20 @@ export interface PetState {
   accessories: AccessoryId[];
   revealedTraits: TraitId[];
   microPets: { id: MicroPetId; hatchedAt: Millis | null; shown: boolean }[];
-  eggs: { receivedAt: Millis; careDaysAtReceive: number }[];
+  /** Яйца микро-питомцев (SPEC 4.8): вид определяется при получении, вылупляется через 3 дня заботы. */
+  eggs: { receivedAt: Millis; careDaysAtReceive: number; kind?: MicroPetId; source?: string }[];
+  /** Купленное в гардеробе (SPEC 4.9). Надетое — accessories. */
+  owned: AccessoryId[];
+  /** Кладовка с угощениями (SPEC 4.10): id → сколько. Не портится. */
+  pantry: Record<string, number>;
+  /** Дневник: истории приключений, ответы на вечерний вопрос, черты, яйца (SPEC 2.3). */
+  diary: DiaryEntry[];
+  /** Вечерний вопрос (SPEC 4.6, P1): раз в логический день. */
+  evening: { day: DayKey; questionKey: string | null; answered: boolean };
+  /** Восстановление серии (SPEC 4.3, P1): 48 ч, «день-догонялка» (цель ×1,5). */
+  streakRestore: { lost: number; until: Millis } | null;
+  /** Напоминания задач (SPEC 5.1, P1), уже показанные сегодня. */
+  reminded: { day: DayKey; ids: string[] };
   /** Модификатор «Тяжёлый день» (R0: cozy), действует до закрытия логического дня. */
   hardDay: boolean;
   adventure: { startedAt: Millis; returnsAt: Millis } | null;
@@ -137,6 +150,19 @@ export interface PetState {
   checkin: { day: DayKey; mood: 1 | 2 | 3 | 4 | 5 | null };
   /** «Аптечка» тяжёлого дня: что уже сделано сегодня. */
   firstAid: { day: DayKey; done: string[] };
+}
+
+/** Запись дневника. Тексты — i18n-ключи, кроме ответа пользователя (text). */
+export interface DiaryEntry {
+  at: Millis;
+  kind: 'adventure' | 'evening' | 'trait' | 'egg' | 'hatch' | 'journey';
+  /** adventure: [место, событие, находка]. */
+  parts?: string[];
+  params?: Record<string, string | number>;
+  questionKey?: string;
+  text?: string;
+  /** Что нашёл/получил: монеты, предмет, яйцо, черта. */
+  loot?: { coins?: number; itemId?: string; egg?: boolean; traitId?: string; microPetId?: string };
 }
 
 // ───────────── Задачи (SPEC 5) ─────────────
@@ -167,7 +193,9 @@ export interface Task {
 
 export interface Journey {
   id: string;
+  /** i18n-ключ шаблона Пути (journey.morning …). */
   title: string;
+  startedAt?: Millis;
   completions: number;
   milestonesReached: number[];
 }
@@ -226,6 +254,8 @@ export interface Settings {
   general: {
     autostart: boolean;
     clickThrough: boolean;
+    /** «Минималистичный виджет» (SPEC 4.10): без островка под питомцем. */
+    minimalWidget: boolean;
     hideFromCapture: boolean;
   };
   hotkeys: {
@@ -268,7 +298,10 @@ export type BubbleAction =
   | 'checkin:3'
   | 'checkin:4'
   | 'checkin:5'
-  | 'hardDay:on';
+  | 'hardDay:on'
+  | 'evening:answer'
+  | 'adventure:diary'
+  | `task:done:${string}`;
 
 export interface Bubble {
   textKey: string;

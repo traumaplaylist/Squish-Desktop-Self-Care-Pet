@@ -27,7 +27,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tasks: { defaultSize: 'S', showSelfCareHints: true },
   blinkPosture: { enabled: true, intervalMin: 30 },
   pet: { chatter: 'often', sounds: true, volume: 0.4, showMicroPets: true },
-  general: { autostart: true, clickThrough: false, hideFromCapture: true },
+  general: { autostart: true, clickThrough: false, hideFromCapture: true, minimalWidget: false },
   hotkeys: {
     quickTask: 'Ctrl+Alt+T',
     water: 'Ctrl+Alt+W',
@@ -57,6 +57,12 @@ export function defaultState(now: number): PersistedState {
       goalDay: null,
       checkin: { day: '', mood: null },
       firstAid: { day: '', done: [] },
+      owned: [],
+      pantry: {},
+      diary: [],
+      evening: { day: '', questionKey: null, answered: false },
+      streakRestore: null,
+      reminded: { day: '', ids: [] },
     },
     economy: {
       coins: 0,

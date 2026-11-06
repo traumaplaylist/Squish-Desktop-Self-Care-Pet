@@ -5,7 +5,7 @@
 import { defaultState } from './defaults';
 import type { PersistedState } from './types';
 
-export const STATE_VERSION = 6;
+export const STATE_VERSION = 7;
 
 export function stateMigrations(now: () => number): Record<number, (d: unknown) => unknown> {
   const def = () => defaultState(now());
@@ -28,6 +28,26 @@ export function stateMigrations(now: () => number): Record<number, (d: unknown) 
     5: (d) => {
       const s = d as PersistedState;
       return { ...s, pet: { ...s.pet, species: s.pet.species ?? 'blob' } };
+    },
+    // v6 → v7 (Неделя 2): гардероб, кладовка, дневник, вечерний вопрос, восстановление серии,
+    // напоминания. Надетый наряд 'outfit:wizard' (Debug) превращается в купленные предметы.
+    6: (d) => {
+      const s = d as PersistedState;
+      const p = def().pet;
+      const legacy = (s.pet.accessories ?? []).includes('outfit:wizard');
+      const wizard = ['head:wizard', 'neck:cape', 'paw:wand'];
+      const accessories = legacy
+        ? [...s.pet.accessories.filter((a) => a !== 'outfit:wizard'), ...wizard]
+        : (s.pet.accessories ?? []);
+      return {
+        ...s,
+        pet: {
+          ...p,
+          ...s.pet,
+          accessories,
+          owned: legacy ? wizard : p.owned,
+        },
+      };
     },
   };
 }
