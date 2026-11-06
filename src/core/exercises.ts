@@ -2,20 +2,21 @@ import type { Exercise } from './types';
 
 /**
  * Упражнения длинного перерыва (SPEC 3.5). Анимации питомца (R0): P0 — lookFar, stretchUp, breathe;
+ * P1 (Неделя 2) — neckRoll, walk, drinkWater;
  * остальные упражнения переиспользуют их. Тексты — только i18n-ключи, без медицинских обещаний.
  */
 export const EXERCISES: readonly Exercise[] = [
-  ex('head-tilts', 3, 'breathe'),
+  ex('head-tilts', 3, 'neckRoll'),
   ex('shoulder-rolls', 3, 'stretchUp'),
   ex('wrists', 3, 'breathe'),
-  ex('walk', 2, 'stretchUp'),
+  ex('walk', 2, 'walk'),
   ex('reach-up', 3, 'stretchUp'),
   ex('shoulder-blades', 3, 'stretchUp'),
   ex('window', 2, 'lookFar'),
   ex('slow-breathing', 3, 'breathe'),
   ex('fists', 2, 'breathe'),
   ex('seated-twist', 3, 'stretchUp'),
-  ex('water', 2, 'breathe'),
+  ex('water', 2, 'drinkWater'),
   ex('palming', 2, 'lookFar'),
 ];
 

@@ -1,5 +1,6 @@
 import type { PetVisualState } from '../../core/types';
 import { AnimatedPetRenderer, type PetViewProps } from './AnimatedPetRenderer';
+import { Accessories, Backpack, hasEyewear, Snack, type Anchors } from './accessories';
 import { PALETTES } from './palettes';
 import './blob.css';
 
@@ -15,7 +16,19 @@ const DRAWN: ReadonlySet<PetVisualState> = new Set<PetVisualState>([
   'onBreak:lookFar',
   'onBreak:stretchUp',
   'onBreak:breathe',
+  'onBreak:neckRoll',
+  'onBreak:walk',
+  'onBreak:drinkWater',
+  'adventure',
 ]);
+
+/** Якоря гардероба блоба (SPEC 4.9). */
+export const BLOB_ANCHORS: Anchors = {
+  head: { x: 100, y: 46, w: 58 },
+  eyes: { l: 76, r: 124, y: 112, size: 17 },
+  neck: { y: 152, w: 122 },
+  paw: { x: 166, y: 138 },
+};
 
 type BlobProps = PetViewProps;
 
@@ -94,6 +107,10 @@ function Mouth({ state }: { state: FaceState }) {
 
 function Blob(p: BlobProps) {
   const c = PALETTES[p.palette];
+  const acc = p.accessories;
+  const A = (layer: 'back' | 'front' | 'eyes' | 'top' | 'paw') => (
+    <Accessories items={acc} anchors={BLOB_ANCHORS} layer={layer} />
+  );
   const base = DRAWN.has(p.state) ? p.state : 'idle';
   // Тактильные реакции меняют лицо на время реакции.
   const r = p.reaction?.name;
@@ -126,6 +143,8 @@ function Blob(p: BlobProps) {
                 </radialGradient>
               </defs>
               <g data-hit>
+                {base === 'adventure' && <Backpack x={160} y={110} />}
+                {A('back')}
                 <ellipse cx={76} cy={176} rx={14} ry={8} fill={c.bodyDark} />
                 <ellipse cx={124} cy={176} rx={14} ry={8} fill={c.bodyDark} />
                 <ellipse className="arm arm-l" cx={34} cy={134} rx={9} ry={13} fill={c.bodyDark} />
@@ -143,7 +162,10 @@ function Blob(p: BlobProps) {
                   opacity={0.35}
                   transform="rotate(-20 72 70)"
                 />
-                {p.reaction?.name === 'drink' && (
+                <g className="arm arm-r">{A('paw')}</g>
+                {A('front')}
+                {r === 'eat' && <Snack x={112} y={144} />}
+                {(p.reaction?.name === 'drink' || base === 'onBreak:drinkWater') && (
                   <g className="glass">
                     <path
                       d="M150 104 L176 104 L172 150 L154 150 Z"
@@ -216,7 +238,7 @@ function Blob(p: BlobProps) {
                   />
                 )}
                 <g className="face" style={{ ['--lid' as string]: c.body }}>
-                  {p.stage === 'wise' && (
+                  {p.stage === 'wise' && !hasEyewear(acc) && (
                     // Мудрый: круглые очки
                     <g className="glasses" fill="none" stroke="#5d5678" strokeWidth={2.5}>
                       <circle cx={76} cy={112} r={21} />
@@ -228,7 +250,9 @@ function Blob(p: BlobProps) {
                   <ellipse cx={58} cy={133} rx={11} ry={6} fill={c.cheek} opacity={0.5} />
                   <ellipse cx={142} cy={133} rx={11} ry={6} fill={c.cheek} opacity={0.5} />
                   <Mouth state={drawn} />
+                  {A('eyes')}
                 </g>
+                {A('top')}
               </g>
             </svg>
           </div>

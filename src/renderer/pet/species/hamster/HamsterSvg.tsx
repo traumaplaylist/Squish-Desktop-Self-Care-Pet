@@ -1,5 +1,6 @@
 import type { PetVisualState } from '../../../../core/types';
 import { AnimatedPetRenderer, type PetViewProps } from '../../AnimatedPetRenderer';
+import { Accessories, Backpack, hasEyewear, Snack, type Anchors } from '../../accessories';
 import '../../blob.css';
 import './hamster.css';
 
@@ -30,6 +31,10 @@ const DRAWN: ReadonlySet<PetVisualState> = new Set<PetVisualState>([
   'onBreak:lookFar',
   'onBreak:stretchUp',
   'onBreak:breathe',
+  'onBreak:neckRoll',
+  'onBreak:walk',
+  'onBreak:drinkWater',
+  'adventure',
 ]);
 
 const EYE_X = [79, 121];
@@ -232,24 +237,40 @@ const wizard = {
   ),
 };
 
-export const HAMSTER_OUTFITS = { wizard } as const;
-export type HamsterOutfit = keyof typeof HAMSTER_OUTFITS;
+/** Предметы, которые хомяк рисует по-своему (колпак на два слоя, большой плащ, палочка). */
+const OWN = ['head:wizard', 'neck:cape', 'paw:wand'] as const;
+
+/** Якоря гардероба хомяка (SPEC 4.9). */
+export const HAMSTER_ANCHORS: Anchors = {
+  head: { x: 100, y: 48, w: 52 },
+  eyes: { l: 79, r: 121, y: 106, size: 12 },
+  neck: { y: 140, w: 132 },
+  paw: { x: 160, y: 152 },
+};
 
 export function Hamster(p: PetViewProps) {
   const base = DRAWN.has(p.state) ? p.state : 'idle';
   const r = p.reaction?.name;
   const drawn: FaceState = r === 'purr' || r === 'giggle' || r === 'dizzy' ? r : base;
-  const outfitId = p.accessories
-    .map((a) => a.replace(/^outfit:/, ''))
-    .find((a): a is HamsterOutfit => a in HAMSTER_OUTFITS);
-  const outfit = outfitId ? HAMSTER_OUTFITS[outfitId] : null;
+  const acc = p.accessories;
+  const hat = acc.includes('head:wizard');
+  const anyHat = acc.some((a) => a.startsWith('head:'));
+  const outfit = {
+    back: hat ? wizard.back : null,
+    top: hat ? wizard.top : null,
+    front: acc.includes('neck:cape') ? wizard.front : null,
+    prop: acc.includes('paw:wand') ? wizard.prop : null,
+  };
+  const A = (layer: 'back' | 'front' | 'eyes' | 'top' | 'paw') => (
+    <Accessories items={acc} anchors={HAMSTER_ANCHORS} layer={layer} skip={OWN} />
+  );
   const classes = [
     'pet',
     'vector',
     'species-hamster',
     `state-${drawn.replace(':', '-')}`,
     `stage-${p.stage}`,
-    outfitId ? `outfit-${outfitId}` : '',
+    hat && acc.includes('neck:cape') && acc.includes('paw:wand') ? 'outfit-wizard' : '',
     p.blinking ? 'blink' : '',
     p.cozy ? 'cozy' : '',
   ]
@@ -261,7 +282,8 @@ export function Hamster(p: PetViewProps) {
     const rot = side === 'l' ? 14 : -14;
     return (
       <g className={`arm arm-${side}`}>
-        {side === 'r' && outfit?.prop}
+        {side === 'r' && outfit.prop}
+        {side === 'r' && A('paw')}
         <ellipse
           cx={x}
           cy={146}
@@ -300,7 +322,9 @@ export function Hamster(p: PetViewProps) {
                   <stop offset="100%" stopColor="#EFA55A" />
                 </radialGradient>
               </defs>
-              {outfit?.back}
+              {outfit.back}
+              {base === 'adventure' && <Backpack x={164} y={112} />}
+              {A('back')}
               <g data-hit>
                 {/* ноги */}
                 <ellipse
@@ -339,7 +363,7 @@ export function Hamster(p: PetViewProps) {
                   fill={CREAM}
                 />
                 {/* хохолок (под колпаком не виден) */}
-                {!outfit?.top && (
+                {!anyHat && (
                   <path
                     d="M90 48 C90 38 98 34 104 38 C106 32 114 32 116 38 C112 38 110 42 110 48 Z"
                     fill={FUR}
@@ -348,7 +372,7 @@ export function Hamster(p: PetViewProps) {
                     strokeLinejoin="round"
                   />
                 )}
-                {p.stage === 'teen' && !outfit?.top && (
+                {p.stage === 'teen' && !anyHat && (
                   <g className="sprout">
                     <path
                       d="M100 32 Q99 20 102 14"
@@ -375,10 +399,12 @@ export function Hamster(p: PetViewProps) {
                     />
                   </g>
                 )}
-                {outfit?.front}
+                {outfit.front}
+                {A('front')}
                 {arm('l')}
                 {arm('r')}
-                {r === 'drink' && (
+                {r === 'eat' && <Snack x={112} y={124} />}
+                {(r === 'drink' || base === 'onBreak:drinkWater') && (
                   <g className="glass">
                     <path
                       d="M150 104 L176 104 L172 150 L154 150 Z"
@@ -416,7 +442,7 @@ export function Hamster(p: PetViewProps) {
                 <g className="face" style={{ ['--lid' as string]: FUR }}>
                   <ellipse cx={62} cy={122} rx={13} ry={8} fill={PINK} opacity={0.55} />
                   <ellipse cx={138} cy={122} rx={13} ry={8} fill={PINK} opacity={0.55} />
-                  {!outfit && (
+                  {!hat && (
                     <g
                       className="brows"
                       stroke={LINE}
@@ -434,7 +460,7 @@ export function Hamster(p: PetViewProps) {
                     fill="#F08C8C"
                   />
                   <Mouth state={drawn} />
-                  {p.stage === 'wise' && (
+                  {p.stage === 'wise' && !hasEyewear(acc) && (
                     <g className="glasses" fill="none" stroke="#5d5678" strokeWidth={2.2}>
                       <circle cx={79} cy={106} r={15} />
                       <circle cx={121} cy={106} r={15} />
@@ -442,7 +468,9 @@ export function Hamster(p: PetViewProps) {
                     </g>
                   )}
                 </g>
-                {outfit?.top}
+                {A('eyes')}
+                {outfit.top}
+                {A('top')}
               </g>
             </svg>
           </div>

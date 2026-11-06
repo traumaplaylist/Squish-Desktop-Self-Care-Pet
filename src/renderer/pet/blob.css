@@ -499,3 +499,111 @@
     transform: translateY(-30px) scale(1.1);
   }
 }
+
+/* ── Неделя 2 ── */
+/* Ест (SPEC 4.10): угощение подлетает ко рту и исчезает, питомец жуёт. */
+.pet .snack {
+  transform-box: view-box;
+  animation: snack 1.6s ease-in forwards;
+}
+.pet .hop[data-reaction='eat'] {
+  animation: chew 1.6s ease-in-out;
+}
+@keyframes snack {
+  0% {
+    opacity: 0;
+    transform: translate(26px, 10px) scale(1);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  45% {
+    transform: translate(-10px, -6px) scale(0.8);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(-12px, -8px) scale(0.45);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-12px, -8px) scale(0.1);
+  }
+}
+@keyframes chew {
+  0%,
+  40%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50%,
+  70%,
+  90% {
+    transform: scale(1.04, 0.95);
+  }
+  60%,
+  80% {
+    transform: scale(0.98, 1.03);
+  }
+}
+
+/* Упражнения (P1): повороты головы, шаги на месте, вода — 3 новые анимации. */
+.pet.state-onBreak-neckRoll .hop {
+  animation: neck-roll 6s ease-in-out infinite;
+}
+.pet.state-onBreak-walk .hop {
+  animation: walk 1.2s ease-in-out infinite;
+}
+.pet.state-onBreak-drinkWater .glass {
+  animation: sip-loop 4s ease-in-out infinite;
+}
+@keyframes neck-roll {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-9deg);
+  }
+  75% {
+    transform: rotate(9deg);
+  }
+}
+@keyframes walk {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-3deg);
+  }
+  25% {
+    transform: translate(0, -5%) rotate(0deg);
+  }
+  50% {
+    transform: translate(0, 0) rotate(3deg);
+  }
+  75% {
+    transform: translate(0, -5%) rotate(0deg);
+  }
+}
+@keyframes sip-loop {
+  0%,
+  20%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  40%,
+  70% {
+    transform: translate(-26px, 4px) rotate(-38deg);
+  }
+}
+
+/* В приключении: питомец с рюкзаком, полупрозрачный — «ушёл»; записка — в виджете. */
+.pet.state-adventure .breath {
+  opacity: 0.55;
+}
+
+/* Предметы в лапке не должны летать поперёк при махании, обнимашках и потягивании. */
+.pet.state-waving .arm-r .acc,
+.pet.state-onBreak-stretchUp .arm .acc,
+.pet .hop[data-reaction='hug'] .arm .acc {
+  display: none;
+}

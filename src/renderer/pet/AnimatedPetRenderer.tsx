@@ -33,6 +33,7 @@ export const REACTION_MS: Partial<Record<PetReaction, number>> = {
   purr: 1800,
   giggle: 1100,
   dizzy: 1400,
+  eat: 1600,
 };
 
 /**

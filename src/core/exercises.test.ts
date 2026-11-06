@@ -8,9 +8,12 @@ describe('exercises', () => {
     expect(EXERCISES).toHaveLength(12);
     expect(new Set(EXERCISES.map((e) => e.id)).size).toBe(12);
   });
-  it('только P0-анимации (R0): lookFar, stretchUp, breathe', () => {
-    for (const e of [...EXERCISES, MICRO_EXERCISE])
-      expect(['lookFar', 'stretchUp', 'breathe']).toContain(e.petAnimation);
+  it('только нарисованные анимации: P0 lookFar/stretchUp/breathe + P1 neckRoll/walk/drinkWater', () => {
+    const drawn = ['lookFar', 'stretchUp', 'breathe', 'neckRoll', 'walk', 'drinkWater'];
+    for (const e of [...EXERCISES, MICRO_EXERCISE]) expect(drawn).toContain(e.petAnimation);
+    // все три P1-анимации действительно используются
+    for (const a of ['neckRoll', 'walk', 'drinkWater'])
+      expect(EXERCISES.some((e) => e.petAnimation === a)).toBe(true);
   });
   it('у всех текстов есть ключи ru и en', () => {
     for (const e of [...EXERCISES, MICRO_EXERCISE]) {
