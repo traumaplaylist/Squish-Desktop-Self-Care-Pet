@@ -71,6 +71,7 @@ export class OverlayManager {
         if (w.isDestroyed() || !this.shown) return;
         w.setAlwaysOnTop(true, 'screen-saver');
         w.show();
+        w.webContents.send('overlay:shown', null);
       };
       if (w.webContents.isLoading()) w.webContents.once('did-finish-load', showNow);
       else showNow();

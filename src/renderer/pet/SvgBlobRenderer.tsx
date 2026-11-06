@@ -204,6 +204,38 @@ function Blob(p: BlobProps) {
                     />
                   </g>
                 )}
+                {p.stage === 'wise' && !acc.some((x) => x.startsWith('head:')) && (
+                  // Мудрый: росток подростка распустился (SPEC 7.2, P1 — 5 стадий с разницей)
+                  <g className="bloom">
+                    <path
+                      d="M100 44 Q99 34 102 26"
+                      stroke="#5aa784"
+                      strokeWidth={3}
+                      fill="none"
+                      strokeLinecap="round"
+                    />
+                    {[0, 72, 144, 216, 288].map((a) => (
+                      <circle
+                        key={a}
+                        cx={102 + 5.5 * Math.cos((a * Math.PI) / 180)}
+                        cy={22 + 5.5 * Math.sin((a * Math.PI) / 180)}
+                        r={4.4}
+                        fill="#FFD1DC"
+                        stroke="#E7A3B6"
+                        strokeWidth={1}
+                      />
+                    ))}
+                    <circle cx={102} cy={22} r={3.4} fill="#FFE08A" />
+                    <ellipse
+                      cx={110}
+                      cy={36}
+                      rx={6}
+                      ry={3.4}
+                      fill="#7fcf9f"
+                      transform="rotate(-25 110 36)"
+                    />
+                  </g>
+                )}
                 {p.stage === 'adult' && (
                   // Взрослый: аккуратный хохолок
                   <path

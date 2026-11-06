@@ -42,6 +42,8 @@ export interface MainEvents {
   'overlay:done': null;
   /** Оверлей: плавно исчезнуть. */
   'overlay:fadeOut': null;
+  /** Оверлей показан (окна создаются заранее скрытыми) — колокольчик начала перерыва. */
+  'overlay:shown': null;
   /** Окно задач: список изменился. */
   tasks: TasksView;
   /** Окно задач: показать в режиме быстрого ввода или панели. t0 — момент вызова (для замера < 150 мс). */
@@ -217,6 +219,7 @@ const EVENTS: Record<keyof MainEvents, true> = {
   'pet:paused': true,
   'overlay:done': true,
   'overlay:fadeOut': true,
+  'overlay:shown': true,
   tasks: true,
   'tasks:mode': true,
   'pet:coins': true,

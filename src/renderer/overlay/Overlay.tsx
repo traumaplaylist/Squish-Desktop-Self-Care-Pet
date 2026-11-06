@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getExercise } from '../../core/exercises';
 import type { Snapshot } from '../../core/types';
 import { applyLook, usePetRenderer } from '../pet/usePetRenderer';
+import { configureSound, playChime } from '../shared/sound';
 import { useI18n } from '../shared/useI18n';
 
 const RING_R = 54;
@@ -21,7 +22,10 @@ export function Overlay({ primary }: { primary: boolean }) {
   const petRef = usePetRenderer(hostRef, primary ? (snap?.pet.species ?? null) : null);
 
   useEffect(() => {
-    void window.squish.invoke('app:getSnapshot').then(setSnap);
+    void window.squish.invoke('app:getSnapshot').then((s0) => {
+      setSnap(s0);
+      configureSound(s0.sounds);
+    });
     const offs = [
       window.squish.on('snapshot', setSnap),
       window.squish.on('overlay:done', () => {
@@ -29,13 +33,15 @@ export function Overlay({ primary }: { primary: boolean }) {
         void petRef.current?.play('celebrate');
       }),
       window.squish.on('overlay:fadeOut', () => setPhase('out')),
+      // Колокольчик начала перерыва — только на основном мониторе (SPEC 7.4).
+      window.squish.on('overlay:shown', () => primary && playChime()),
     ];
     const raf = requestAnimationFrame(() => setPhase('shown')); // один кадр — запустить CSS-переход появления
     return () => {
       offs.forEach((o) => o());
       cancelAnimationFrame(raf);
     };
-  }, [petRef]);
+  }, [petRef, primary]);
 
   // Последний известный перерыв держим, чтобы во время «радости» и затухания не мигал пустой экран.
   const lastBreak = useRef<Snapshot['scheduler']['break']>(null);

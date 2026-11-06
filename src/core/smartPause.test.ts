@@ -155,3 +155,51 @@ describe('decideSuppression', () => {
     });
   });
 });
+
+describe('запись экрана (SPEC 3.3.4, P1)', () => {
+  it('находит OBS/ShareX среди процессов, без учёта регистра и пути', async () => {
+    const { findCaptureApp } = await import('./smartPause');
+    expect(
+      findCaptureApp([
+        'c:\\windows\\explorer.exe',
+        'c:\\program files\\obs-studio\\bin\\64bit\\obs64.exe',
+      ]),
+    ).toBe('obs64.exe');
+    expect(findCaptureApp(['C:\\Tools\\sharex.EXE'])).toBe('ShareX.exe');
+    expect(findCaptureApp(['c:\\x\\code.exe'])).toBeNull();
+  });
+  it('подавляет с причиной capture; выключатель в настройках', async () => {
+    const { decideSuppression } = await import('./smartPause');
+    const r = {
+      mic: [],
+      camera: [],
+      fullscreen: null,
+      foregroundExe: 'code.exe',
+      capture: 'obs64.exe',
+    } as const;
+    const s = { fullscreen: true, mic: true, camera: true, exceptionApps: [] };
+    expect(decideSuppression({ ...r, mic: [...r.mic], camera: [...r.camera] }, s, null)).toEqual({
+      reason: 'capture',
+      app: 'obs64.exe',
+    });
+    expect(
+      decideSuppression({ ...r, mic: [], camera: [] }, { ...s, capture: false }, null),
+    ).toBeNull();
+  });
+});
+
+describe('запись экрана: детектор «не знаю»', () => {
+  it("capture: 'unknown' (не Windows) — не подавлять", async () => {
+    const { decideSuppression } = await import('./smartPause');
+    const r = {
+      mic: [],
+      camera: [],
+      fullscreen: null,
+      foregroundExe: null,
+      capture: 'unknown' as const,
+    };
+    expect(
+      decideSuppression(r, { fullscreen: true, mic: true, camera: true, exceptionApps: [] }, null),
+    ).toBeNull();
+  });
+});

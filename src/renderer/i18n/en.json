@@ -574,5 +574,7 @@
   "settings.background": "Break background",
   "settings.bg.gradient1": "Dusk",
   "settings.bg.gradient2": "Sea",
-  "settings.bg.gradient3": "Dawn"
+  "settings.bg.gradient3": "Dawn",
+  "settings.capture": "Stay quiet while recording the screen",
+  "settings.captureHint": "OBS, ShareX, Bandicam, Camtasia"
 }

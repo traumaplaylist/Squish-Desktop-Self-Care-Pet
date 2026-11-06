@@ -8,6 +8,7 @@ import { classifyNotificationState } from '../../core/notificationState';
 import {
   activeConsentApps,
   decideSuppression,
+  findCaptureApp,
   type ConsentEntry,
   type DetectorReadings,
 } from '../../core/smartPause';
@@ -44,6 +45,7 @@ export class SmartPause {
     camera: 'unknown',
     fullscreen: 'unknown',
     foregroundExe: 'unknown',
+    capture: 'unknown',
   };
 
   private readonly ownExePath = process.execPath;
@@ -90,6 +92,15 @@ export class SmartPause {
     },
   };
 
+  /** Запись экрана (SPEC 3.3.4, P1): OBS, ShareX, Bandicam, Camtasia среди запущенных процессов. */
+  private readonly capture: Detector<string | null> = {
+    name: 'capture',
+    check: async () => {
+      const procs = await runningProcessPaths();
+      return procs === null ? 'unknown' : findCaptureApp(procs);
+    },
+  };
+
   start(): void {
     if (this.timer) return;
     void this.poll();
@@ -106,13 +117,14 @@ export class SmartPause {
     this.busy = true;
     try {
       const sp = this.getSettings().smartPause;
-      const [mic, camera, fullscreen, foregroundExe] = await Promise.all([
+      const [mic, camera, fullscreen, foregroundExe, capture] = await Promise.all([
         sp.mic ? this.deviceDetector('microphone').check() : Promise.resolve([] as string[]),
         sp.camera ? this.deviceDetector('webcam').check() : Promise.resolve([] as string[]),
         sp.fullscreen ? this.fullscreen.check() : Promise.resolve(null),
         this.foreground.check(),
+        sp.capture ? this.capture.check() : Promise.resolve(null),
       ]);
-      this.readings = { mic, camera, fullscreen, foregroundExe };
+      this.readings = { mic, camera, fullscreen, foregroundExe, capture };
       const next = decideSuppression(this.readings, sp, this.ownExeName);
       if (next?.reason !== this.last?.reason || next?.app !== this.last?.app) {
         log(`умная пауза: ${next ? `${next.reason}${next.app ? ` (${next.app})` : ''}` : 'нет'}`);

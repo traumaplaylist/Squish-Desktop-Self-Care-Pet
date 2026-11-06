@@ -105,17 +105,43 @@ export interface DetectorReadings {
   fullscreen: Extract<SuppressReason, 'fullscreen' | 'game' | 'presentation'> | null | 'unknown';
   /** basename exe окна на переднем плане. */
   foregroundExe: string | null | 'unknown';
+  /** Запущенная программа записи экрана (SPEC 3.3.4, P1), basename или null. Поле необязательно. */
+  capture?: string | null | 'unknown';
+}
+
+/** Программы записи/трансляции экрана (SPEC 3.3.4). Сравнение — basename без учёта регистра. */
+export const CAPTURE_APPS = [
+  'obs64.exe',
+  'obs32.exe',
+  'obs.exe',
+  'ShareX.exe',
+  'Bandicam.exe',
+  'bdcam.exe',
+  'CamtasiaRecorder.exe',
+] as const;
+
+/** Первая найденная программа записи среди запущенных процессов (полные пути или имена). */
+export function findCaptureApp(processes: Iterable<string>): string | null {
+  const want = new Map(CAPTURE_APPS.map((a) => [norm(a), a] as const));
+  for (const p of processes) {
+    const base = norm(p.split(/[\\/]/).pop() ?? p);
+    const hit = want.get(base);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 export interface SmartPauseSettings {
   fullscreen: boolean;
   mic: boolean;
   camera: boolean;
+  /** Запись экрана (P1); по умолчанию включено. */
+  capture?: boolean;
   exceptionApps: readonly string[];
 }
 
 /**
- * Приоритет причин: созвон (микрофон, камера) → полный экран → приложение-исключение.
+ * Приоритет причин: созвон (микрофон, камера) → полный экран → запись экрана → приложение-исключение.
  * Наш собственный exe на переднем плане никогда не считается фуллскрином (R0).
  */
 export function decideSuppression(
@@ -131,6 +157,8 @@ export function decideSuppression(
   if (s.fullscreen && r.fullscreen && r.fullscreen !== 'unknown' && !ownFg) {
     return { reason: r.fullscreen, app: fg };
   }
+  if (s.capture !== false && typeof r.capture === 'string' && r.capture && r.capture !== 'unknown')
+    return { reason: 'capture', app: r.capture };
   if (fg && s.exceptionApps.some((a) => norm(a) === norm(fg))) return { reason: 'app', app: fg };
   return null;
 }

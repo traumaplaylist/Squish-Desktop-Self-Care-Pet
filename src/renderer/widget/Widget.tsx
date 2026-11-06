@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Snapshot } from '../../core/types';
 import { applyLook, usePetRenderer } from '../pet/usePetRenderer';
 import { MicroPet } from '../pet/micro';
+import { configureSound, playCelebrate, playDrink, warmUpSound } from '../shared/sound';
 import { useI18n } from '../shared/useI18n';
 import { Island } from './Island';
 
@@ -24,7 +25,12 @@ export function Widget() {
       pet.setState(snapRef.current.pet.visual);
     }
     const offs = [
-      window.squish.on('pet:play', (r) => void pet.play(r)),
+      window.squish.on('pet:play', (r) => {
+        // Звуки (SPEC 7.4, P1): глоток и радость; громкость и выключение — из настроек.
+        if (r === 'drink') playDrink();
+        if (r === 'celebrate') playCelebrate();
+        void pet.play(r);
+      }),
       window.squish.on('pet:eyes', (d) => pet.lookAt(d)),
       window.squish.on('pet:paused', (p) => pet.setPaused(p)),
     ];
@@ -37,7 +43,9 @@ export function Widget() {
   });
 
   useEffect(() => {
+    warmUpSound();
     const apply = (s: Snapshot) => {
+      configureSound(s.sounds);
       snapRef.current = s;
       setSnap(s);
       const pet = petRef.current;

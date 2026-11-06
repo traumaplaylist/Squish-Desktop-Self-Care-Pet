@@ -133,6 +133,12 @@ export function SettingsPage() {
           onChange={(v) => set({ smartPause: { camera: v } })}
         />
         <Toggle
+          label={t('settings.capture')}
+          hint={t('settings.captureHint')}
+          value={sp.capture}
+          onChange={(v) => set({ smartPause: { capture: v } })}
+        />
+        <Toggle
           label={t('settings.typing')}
           hint={t('settings.typingHint')}
           value={sp.dontInterruptTyping}
