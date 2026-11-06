@@ -37,7 +37,7 @@ npm run dev
 | `npm run i18n:check` | все ключи есть и в `ru`, и в `en` |
 | `npm run icons` | перерисовать иконки из SVG питомца |
 
-E2E-сценарии: `node scripts/e2e-breaks.mjs`, `e2e-tasks.mjs`, `e2e-pet.mjs`, `e2e-onboarding.mjs`. Перед ними `npm run build`, на Linux они запускаются через `xvfb-run -a`.
+E2E-сценарии: `node scripts/e2e-breaks.mjs`, `e2e-tasks.mjs`, `e2e-pet.mjs`, `e2e-onboarding.mjs`, `e2e-species.mjs`. Перед ними `npm run build`, на Linux они запускаются через `xvfb-run -a`.
 
 ### Debug-режим
 
@@ -95,7 +95,7 @@ src/
    - состояния: `idle`, `happy`, `sleeping`, `waving`, `quiet`, `thirsty`, `tired`, `onBreak:lookFar`, `onBreak:stretchUp`, `onBreak:breathe`;
    - реакции: `bounce`, `drink`, `celebrate`, `coinCatch`, `blink`, `straighten`, `hug`, `purr`, `giggle`, `dizzy`.
 
-   Зацикленные состояния — 1–3 секунды, реакции — по длительности из `REACTION_MS` в `SvgBlobRenderer.tsx`.
+   Зацикленные состояния — 1–3 секунды, реакции — по длительности из `REACTION_MS` в `AnimatedPetRenderer.tsx`.
 3. **Спрайт-лист.** Склей кадры в один PNG (например, TexturePacker или `montage -tile 16x -geometry 256x256+0+0 -background none`). Рядом положи JSON:
    ```json
    { "frameSize": 256, "animations": { "idle": { "frames": [0, 1, 2, 3], "fps": 12, "loop": true },
@@ -105,3 +105,13 @@ src/
 5. **Реализуй `SpriteSheetRenderer`.** Это класс с тем же интерфейсом `PetRenderer`: `setState` выбирает зацикленную анимацию, `play(reaction)` проигрывает разовую и возвращает Promise. Кадры меняй через `background-position` по таймеру с частотой fps анимации; `requestAnimationFrame` не используй, это требование SPEC 7.5 к CPU. `setPaused` останавливает таймер, `lookAt` можно игнорировать или сдвигать слой глаз.
 6. **Подключи** его в `createPetRenderer.ts`: `case 'spriteSheet': return new SpriteSheetRenderer(container);`. Затем замени `'svgBlob'` на `'spriteSheet'` в местах вызова: виджет, оверлей, онбординг, «Дом».
 7. **Проверь:** `npm run dev:debug`, в окне Debug прощёлкай все состояния и реакции, затем запусти `node scripts/measure-idle.mjs`. Анимация на 12 fps в покое должна укладываться в бюджет CPU.
+
+## Как добавить зверя из деталей (PNG)
+
+Питомец может собираться из отдельных PNG-деталей (`LayeredRenderer`). Пример — `src/renderer/pet/species/hamster/`.
+
+1. Положи детали в `src/renderer/pet/species/<id>/`: `body`, `arm-l`, `arm-r`, `feet`, `shadow`, `blush`, глаза `eyes-open/closed/happy/sleepy`, рты `mouth-smile/open/o/flat`. Фон должен быть прозрачным. Наряд — `hat`, `cape-front`, `cape-back`, `wand` и т.п.
+2. `sizes.json` — размеры каждой PNG `{ "body": [261, 288], … }`. Тест `rig.test.ts` проверит, что он совпадает с файлами.
+3. `rig.ts` — где лежит каждая деталь в координатах тела, плечи (точки вращения лапок), якоря стакана, капли пота и шарфа, слои нарядов.
+4. Добавь id в `SpeciesId`/`SPECIES` (`core/types.ts`), рига в `RIGS` (`species/index.ts`) и ключи `species.<id>`, `species.<id>.name` в i18n.
+5. Проверь: `SQUISH_SPECIES=<id> npm run dev:debug` и `node scripts/e2e-species.mjs`.
