@@ -58,21 +58,26 @@ function Eyes({ state }: { state: FaceState }) {
       </g>
     );
   const quiet = state === 'quiet';
+  const tired = state === 'tired';
+  // Устал — глаза ниже и уже (прищур), без «век»: у тела градиент, заливка видна пятном.
+  const ry = quiet ? 5.5 : tired ? 7.5 : 11;
+  const cy = EYE_Y + (tired ? 3 : 0);
   return (
-    <g className={`eyes open${state === 'tired' ? ' tired' : ''}`}>
+    <g className={`eyes open${tired ? ' tired' : ''}`}>
       {EYE_X.map((cx) => (
         <g key={cx} className="eye">
           <g className="pupil">
-            <ellipse cx={cx} cy={EYE_Y} rx={9.5} ry={quiet ? 5.5 : 11} fill={EYE} />
-            <circle cx={cx + 2.5} cy={EYE_Y - (quiet ? 1.5 : 4)} r={quiet ? 2 : 3.4} fill="#fff" />
-            {!quiet && <circle cx={cx - 3} cy={EYE_Y + 5} r={1.4} fill="#fff" opacity={0.7} />}
-          </g>
-          {state === 'tired' && (
-            <path
-              className="lid"
-              d={`M${cx - 12} 92 L${cx + 12} 92 L${cx + 12} 104 Q${cx} 98 ${cx - 12} 104 Z`}
+            <ellipse cx={cx} cy={cy} rx={9.5} ry={ry} fill={EYE} />
+            <circle
+              cx={cx + 2.5}
+              cy={cy - (quiet ? 1.5 : tired ? 2 : 4)}
+              r={quiet || tired ? 2.2 : 3.4}
+              fill="#fff"
             />
-          )}
+            {!quiet && !tired && (
+              <circle cx={cx - 3} cy={cy + 5} r={1.4} fill="#fff" opacity={0.7} />
+            )}
+          </g>
         </g>
       ))}
     </g>

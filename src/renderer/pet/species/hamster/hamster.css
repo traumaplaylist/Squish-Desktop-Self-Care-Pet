@@ -28,3 +28,8 @@
 .pet.species-hamster.state-onBreak-stretchUp .wizard-wand {
   display: none;
 }
+/* Машет / обнимает — палочку убираем, иначе она летает поперёк. */
+.pet.species-hamster.state-waving .wizard-wand,
+.pet.species-hamster .hop[data-reaction='hug'] .wizard-wand {
+  display: none;
+}
