@@ -52,7 +52,11 @@ export interface MainEvents {
   lang: Lang;
   /** Настройки изменились (окно настроек). */
   settings: Settings;
+  /** «Дом питомца»: открыть вкладку (дневник по вечернему вопросу, гардероб…). */
+  'home:tab': HomeTab;
 }
+
+export type HomeTab = 'today' | 'week' | 'pet' | 'diary' | 'shop';
 
 export interface OnboardingResult {
   name: string;
@@ -94,6 +98,17 @@ export interface RendererCommands {
   /** Окно задач видно и поле в фокусе: t0 из 'tasks:mode' (замер). */
   'tasks:shown': number;
   'tasks:firstAid': string;
+  /** Пути (SPEC 5.5). */
+  'journey:start': string;
+  'journey:stop': string;
+  /** Магазин: предмет гардероба или угощение (SPEC 4.9, 4.10). */
+  'shop:buy': string;
+  'wardrobe:toggle': string;
+  'pet:feed': string;
+  /** Показать/скрыть микро-питомца в виджете (номер в коллекции). */
+  'micro:toggle': number;
+  /** Ответ на вечерний вопрос (SPEC 4.6). */
+  'evening:answer': string;
   'app:open': 'home' | 'settings' | 'tasks';
   'settings:update': SettingsPatch;
   /** Сброс прогресса (окно уже дважды спросило). */
@@ -103,6 +118,8 @@ export interface RendererCommands {
   'debug:species': SpeciesId;
   /** Надеть/снять наряд (до гардероба — только Debug). */
   'debug:outfit': string | null;
+  /** Debug: приключение «сейчас» / вернуться сейчас, яйцо, вечерний вопрос. */
+  'debug:week2': 'adventure' | 'return' | 'egg' | 'hatch' | 'evening' | 'trait';
   'bubble:action': BubbleAction;
   'debug:setVisual': PetVisualState | null;
   'debug:setSpeed': number;
@@ -159,6 +176,13 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'tasks:setMode': true,
   'tasks:shown': true,
   'tasks:firstAid': true,
+  'journey:start': true,
+  'journey:stop': true,
+  'shop:buy': true,
+  'wardrobe:toggle': true,
+  'pet:feed': true,
+  'micro:toggle': true,
+  'evening:answer': true,
   'app:open': true,
   'settings:update': true,
   'settings:resetProgress': true,
@@ -166,6 +190,7 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'debug:pet': true,
   'debug:species': true,
   'debug:outfit': true,
+  'debug:week2': true,
   'bubble:action': true,
   'debug:setVisual': true,
   'debug:setSpeed': true,
@@ -197,6 +222,7 @@ const EVENTS: Record<keyof MainEvents, true> = {
   'pet:coins': true,
   lang: true,
   settings: true,
+  'home:tab': true,
 };
 
 export const RENDERER_COMMANDS = Object.keys(COMMANDS) as (keyof RendererCommands)[];

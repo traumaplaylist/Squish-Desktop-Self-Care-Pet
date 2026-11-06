@@ -369,3 +369,103 @@ describe('Engine', () => {
     expect((closed as { activeMs: number }).activeMs).toBeGreaterThan(4 * MINUTE);
   });
 });
+
+describe('Engine — Неделя 2', () => {
+  const ready = () => {
+    const t = setup();
+    t.step(SECOND);
+    t.engine.dismissBubble();
+    t.engine.answerCheckin(4);
+    t.engine.dismissBubble();
+    return t;
+  };
+  it('цель дня → приключение 30 мин; вернулся — история, монеты, запись в дневнике', () => {
+    const t = ready();
+    t.engine.random = () => 0.99;
+    t.engine.debugPet('energy');
+    t.engine.debugPet('energy');
+    t.engine.debugPet('energy');
+    t.step(SECOND);
+    expect(t.state().pet.adventure).not.toBeNull();
+    expect(t.engine.snapshot().pet.visual).toBe('adventure');
+    expect(t.engine.snapshot().pet.adventure?.returnsAt).toBe(t.state().pet.adventure!.returnsAt);
+    const coins = t.state().economy.coins;
+    t.engine.dismissBubble();
+    t.step(31 * MINUTE);
+    expect(t.state().pet.adventure).toBeNull();
+    expect(t.state().pet.diary.at(-1)?.kind).toBe('adventure');
+    expect(t.state().economy.coins - coins).toBeGreaterThanOrEqual(5);
+    expect(t.events.some((e) => e.type === 'adventure_finished')).toBe(true);
+  });
+  it('магазин: купил — надел, монеты списаны; без денег не купить', () => {
+    const t = ready();
+    expect(t.engine.buy('head:beanie')).toBe(false);
+    t.engine.debugPet('coins');
+    expect(t.engine.buy('head:beanie')).toBe(true);
+    expect(t.state().pet.accessories).toContain('head:beanie');
+    expect(t.state().economy.coins).toBe(t.engine.homeStats().pet.coins);
+    t.engine.toggleWear('head:beanie');
+    expect(t.state().pet.accessories).not.toContain('head:beanie');
+  });
+  it('угощение: ест (реакция eat), любимое раскрывает черту', () => {
+    const t = ready();
+    t.engine.debugPet('coins');
+    for (const id of ['berry', 'carrot', 'cookie', 'cheese', 'pie']) t.engine.buy(id);
+    for (const id of ['berry', 'carrot', 'cookie', 'cheese', 'pie']) t.engine.feed(id);
+    expect(t.effects.filter((e) => e.type === 'petReaction' && e.reaction === 'eat')).toHaveLength(
+      5,
+    );
+    expect(t.state().pet.revealedTraits).toContain('favoriteFood');
+    expect(t.state().pet.pantry).toEqual({});
+  });
+  it('задача про еду — питомец ест рядом', () => {
+    const t = ready();
+    const id = t.engine.createTaskFromText('пообедать не за компьютером')!;
+    t.engine.completeTask(id);
+    expect(t.effects.some((e) => e.type === 'petReaction' && e.reaction === 'eat')).toBe(true);
+  });
+  it('Путь: задачи на каждый день, этап 5 → монеты; сойти с Пути — задачи уходят', () => {
+    const t = ready();
+    t.engine.startJourney('back');
+    const view = t.engine.tasksView();
+    expect(view.journeys.active.map((j) => j.id)).toEqual(['back']);
+    expect(view.open).toHaveLength(2);
+    const coins0 = t.state().economy.coins;
+    for (let day = 0; day < 3; day++) {
+      for (const it2 of t.engine.tasksView().open) t.engine.completeTask(it2.id);
+      t.clock.advance(24 * 60 * MINUTE);
+      t.engine.tick();
+    }
+    const j = t.tasks().journeys[0]!;
+    expect(j.completions).toBe(6);
+    expect(j.milestonesReached).toEqual([5]);
+    expect(t.state().economy.coins - coins0).toBeGreaterThanOrEqual(20);
+    t.engine.stopJourney('back');
+    expect(t.engine.tasksView().journeys.active).toEqual([]);
+    expect(t.engine.tasksView().open).toHaveLength(0);
+  });
+  it('вечерний вопрос в 18:00, ответ — в дневник', () => {
+    const t = ready();
+    t.clock.set(new Date(2026, 10, 5, 18, 5).getTime());
+    t.step(SECOND);
+    expect(t.engine.snapshot().bubble?.textKey).toMatch(/^evening\.q\d$/);
+    t.engine.answerEvening('  дописал главу  ');
+    const e = t.state().pet.diary.at(-1)!;
+    expect(e.kind).toBe('evening');
+    expect(e.text).toBe('дописал главу');
+    expect(t.engine.homeStats().evening).toBeNull();
+  });
+  it('напоминание по времени: облачко с задачей и кнопкой «сделано»', () => {
+    const t = ready();
+    const id = t.engine.createTaskFromText('позвонить маме в 12:30')!;
+    t.engine.dismissBubble();
+    t.clock.set(new Date(2026, 10, 5, 12, 31).getTime());
+    t.step(SECOND);
+    const b = t.engine.snapshot().bubble;
+    expect(b?.textKey).toBe('task.reminder');
+    expect(b?.actions?.[0]?.action).toBe(`task:done:${id}`);
+    t.engine.dismissBubble();
+    t.step(5 * SECOND);
+    expect(t.engine.snapshot().bubble?.textKey).not.toBe('task.reminder'); // второй раз не зовёт
+  });
+});

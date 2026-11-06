@@ -18,7 +18,7 @@ import { dayKey } from '../core/day';
 import { STATE_VERSION, stateMigrations } from '../core/migrations';
 import { DEFAULT_SETTINGS, defaultState, defaultTasks } from '../core/defaults';
 import type { Effect } from '../core/events';
-import type { ProbeResult, RendererCommands, RendererInvokes } from '../core/ipc';
+import type { HomeTab, ProbeResult, RendererCommands, RendererInvokes } from '../core/ipc';
 import { classifyNotificationState } from '../core/notificationState';
 import {
   SPECIES,
@@ -285,7 +285,16 @@ async function main(): Promise<void> {
       };
     },
     debug: DEBUG,
+    t: (k) => t(k),
   });
+
+  // «Дом питомца» на нужной вкладке: свежему окну — через home:get, открытому — событием.
+  let pendingHomeTab: HomeTab | null = null;
+  const openHomeTab = (tab: HomeTab) => {
+    const w = openPage('home');
+    if (w.webContents.isLoading()) pendingHomeTab = tab;
+    else w.webContents.send('home:tab', tab);
+  };
 
   // ── Умная пауза: детекторы раз в 5 с (SPEC 3.3) ──
   const smartPause = new SmartPause(
@@ -540,7 +549,38 @@ async function main(): Promise<void> {
   on('tasks:setMode', (m) => (m === 'quick' || m === 'panel') && tasksWin.setMode(m));
   on('tasks:shown', (t0) => tasksWin.shown(t0));
   taskCmd('tasks:firstAid', (id) => typeof id === 'string' && engine.firstAid(id));
-  handle('home:get', () => engine.homeStats());
+  handle('home:get', () => {
+    const tab = pendingHomeTab;
+    pendingHomeTab = null;
+    return tab ? { ...engine.homeStats(), openTab: tab } : engine.homeStats();
+  });
+  on('journey:start', (id) => typeof id === 'string' && engine.startJourney(id));
+  on('journey:stop', (id) => typeof id === 'string' && engine.stopJourney(id));
+  on('shop:buy', (id) => {
+    if (typeof id === 'string') engine.buy(id);
+    publish();
+  });
+  on('wardrobe:toggle', (id) => {
+    if (typeof id === 'string') engine.toggleWear(id);
+    publish();
+  });
+  on('pet:feed', (id) => {
+    if (typeof id === 'string') engine.feed(id);
+    publish();
+  });
+  on('micro:toggle', (i) => {
+    if (typeof i === 'number') engine.toggleMicroPet(i);
+    publish();
+  });
+  on('evening:answer', (text) => {
+    if (typeof text === 'string') engine.answerEvening(text);
+    publish();
+  });
+  on('debug:week2', (cmd) => {
+    if (!DEBUG) return;
+    engine.debugWeek2(cmd);
+    publish();
+  });
   handle('settings:get', () => ({
     settings: settingsStore.get(),
     hotkeysFailed: engine.snapshot().hotkeysFailed,
@@ -648,8 +688,10 @@ async function main(): Promise<void> {
   on('debug:outfit', (o) => {
     if (!DEBUG) return;
     const s = stateStore.get();
-    const accessories = typeof o === 'string' && /^[a-z]+$/.test(o) ? [`outfit:${o}`] : [];
-    stateStore.set({ ...s, pet: { ...s.pet, accessories } }, 0);
+    // Наряд «Волшебник» = три предмета гардероба (колпак, плащ, палочка).
+    const set = o === 'wizard' ? ['head:wizard', 'neck:cape', 'paw:wand'] : [];
+    const owned = [...new Set([...s.pet.owned, ...set])];
+    stateStore.set({ ...s, pet: { ...s.pet, accessories: set, owned } }, 0);
     publish();
   });
   on('debug:pet', (cmd) => {
@@ -663,7 +705,13 @@ async function main(): Promise<void> {
     else if (a === 'quiet:ignoreApp') ignoreQuietApp();
     else if (a === 'dismiss') engine.dismissBubble();
     else if (a === 'hardDay:on') engine.setHardDay(true);
-    else if (a.startsWith('checkin:')) {
+    else if (a === 'evening:answer' || a === 'adventure:diary') {
+      engine.dismissBubble();
+      openHomeTab('diary');
+    } else if (a.startsWith('task:done:')) {
+      engine.dismissBubble();
+      engine.completeTask(a.slice('task:done:'.length));
+    } else if (a.startsWith('checkin:')) {
       const m = Number(a.slice(8));
       if (m >= 1 && m <= 5) engine.answerCheckin(m as 1 | 2 | 3 | 4 | 5);
     }

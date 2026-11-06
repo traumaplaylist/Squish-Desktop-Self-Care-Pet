@@ -63,6 +63,34 @@ import {
 } from '../core/tasks';
 import { dayScore, lastDays, prevDayKey, statsByDay } from '../core/stats';
 import { selectVisual } from '../core/visual';
+import { addDiary, adventureDue, finishAdventure, startAdventure } from '../core/adventure';
+import { questionFor, shouldAskEvening } from '../core/evening';
+import { chance } from '../core/hash';
+import {
+  addCompletion,
+  JOURNEY_IDS,
+  JOURNEY_TEMPLATES,
+  MILESTONE_COINS,
+  MILESTONE_REWARD,
+  newJourney,
+  nextMilestone,
+  type JourneyTemplate,
+} from '../core/journeys';
+import { BIG_TASK_EGG_PCT, giveEgg, hatchEggs, toggleShown } from '../core/microPets';
+import { restoreGoal, tryRestoreStreak } from '../core/pet';
+import { dueReminders } from '../core/reminders';
+import {
+  buyItem,
+  buyTreat,
+  giftItem,
+  isFoodTask,
+  takeTreat,
+  toggleItem,
+  TREAT_IDS,
+  TREATS,
+  WARDROBE,
+} from '../core/shop';
+import { favoriteFood, revealTrait, traitLine } from '../core/traits';
 import { drink, undoDrink, waterForDay, waterTick, type WaterConfig } from '../core/water';
 
 export interface EngineDeps {
@@ -92,6 +120,17 @@ export interface EngineDeps {
   /** Debug: последние показания детекторов. */
   getDetectorReadings?: () => NonNullable<Snapshot['debugInfo']>['detectors'];
   debug: boolean;
+  /** Перевод i18n-ключа (названия задач Путей пишутся в tasks.json уже переведёнными). */
+  t?: (key: string) => string;
+}
+
+/** Время суток для окошка островка (SPEC 4.10): меняется не чаще раза в минуту. */
+export function timeOfDay(ts: number): 'morning' | 'day' | 'evening' | 'night' {
+  const h = new Date(ts).getHours();
+  if (h >= 6 && h < 11) return 'morning';
+  if (h >= 11 && h < 18) return 'day';
+  if (h >= 18 && h < 22) return 'evening';
+  return 'night';
 }
 
 const BUBBLE_DEFAULT_MS = 4000;
@@ -200,7 +239,20 @@ export class Engine {
       );
       pet = r.pet;
       r.events.forEach((e) => this.d.appendEvent(e));
+      for (const e of r.events) {
+        if (e.type === 'egg_hatched')
+          pet = addDiary(pet, { at: now, kind: 'hatch', loot: { microPetId: e.microPetId } });
+        if (e.type === 'egg_received' && e.source === 'streak')
+          pet = addDiary(pet, { at: now, kind: 'egg', params: { source: 'streak' } });
+      }
       if (r.events.some((e) => e.type === 'stage_up')) {
+        // SPEC 4.5: на новой стадии раскрывается черта характера.
+        const tr = revealTrait(pet, this.random());
+        pet = tr.pet;
+        if (tr.traitId) {
+          pet = addDiary(pet, { at: now, kind: 'trait', loot: { traitId: tr.traitId } });
+          this.d.appendEvent({ type: 'trait_revealed', at: now, traitId: tr.traitId });
+        }
         this.setBubble({ textKey: 'pet.grew' }, 8000);
         this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
       }
@@ -259,7 +311,11 @@ export class Engine {
       );
     }
     this.celebrateGoal(now);
+    this.maybeRestoreStreak(now);
+    this.maybeReturnFromAdventure(now, after);
     this.maybeCheckin(now, after);
+    this.maybeEvening(now, after);
+    this.maybeRemind(now, after);
     this.maybeChatter(now, after);
     if (r.remind && !this.bubble) {
       this.setBubble(
@@ -293,15 +349,145 @@ export class Engine {
     }
   }
 
-  /** Цель дня достигнута — радуемся один раз за день (приключения — P1, Неделя 2). */
+  /**
+   * Цель дня достигнута — радуемся один раз за день и уходим в приключение (SPEC 4.4):
+   * 30 мин, записка в виджете; перерывы при этом работают.
+   */
   private celebrateGoal(now: number): void {
     const st = this.d.getState();
     const day = dayKey(now);
     if (st.pet.goalDay === day || !goalReached(st.pet)) return;
-    this.d.setState({ ...st, pet: { ...st.pet, goalDay: day } }, 0);
+    const pet = startAdventure({ ...st.pet, goalDay: day }, now);
+    this.d.setState({ ...st, pet }, 0);
+    if (pet.adventure)
+      this.d.appendEvent({
+        type: 'adventure_started',
+        at: now,
+        returnsAt: pet.adventure.returnsAt,
+      });
     if (this.sched.phase === 'suppressed') return; // на созвоне — молча (SPEC 2.1)
     this.setBubble({ textKey: 'goal.reached' }, 6000);
     this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
+  }
+
+  /** Вернулся из приключения — история и находка. Во время перерыва и созвона ждём. */
+  private maybeReturnFromAdventure(now: number, s: SchedulerState): void {
+    const st = this.d.getState();
+    if (!adventureDue(st.pet, now) || this.bubble) return; // не перебивать другое облачко
+    if (s.phase !== 'working' && s.phase !== 'offHours' && s.phase !== 'idle') return;
+    const r = finishAdventure(st.pet, now, this.random);
+    const economy = payCoins(economyForDay(st.economy, dayKey(now)), r.coins);
+    this.d.setState({ ...st, pet: r.pet, economy }, 0);
+    this.d.appendEvent({
+      type: 'adventure_finished',
+      at: now,
+      storyKey: (r.entry.parts ?? []).join('|'),
+      coins: r.coins,
+    });
+    if (r.entry.loot?.traitId)
+      this.d.appendEvent({ type: 'trait_revealed', at: now, traitId: r.entry.loot.traitId });
+    if (r.entry.loot?.egg)
+      this.d.appendEvent({ type: 'egg_received', at: now, source: 'adventure' });
+    this.setBubble(
+      {
+        textKey: 'adv.back',
+        params: { coins: r.coins },
+        parts: r.entry.parts ?? [],
+        actions: [{ labelKey: 'adv.diary', action: 'adventure:diary' }],
+      },
+      30_000,
+    );
+    this.d.onEffects([
+      { type: 'petReaction', reaction: 'celebrate' },
+      { type: 'coins', count: r.coins, surprise: !!(r.entry.loot?.itemId || r.entry.loot?.egg) },
+    ]);
+  }
+
+  /** «День-догонялка» (SPEC 4.3): набрал цель ×1,5 — серия вернулась. */
+  private maybeRestoreStreak(now: number): void {
+    const st = this.d.getState();
+    if (!st.pet.streakRestore) return;
+    const r = tryRestoreStreak(st.pet, now);
+    if (r.pet === st.pet) return;
+    this.d.setState({ ...st, pet: r.pet }, 0);
+    if (!r.restored) return;
+    this.d.appendEvent({ type: 'streak_restored', at: now });
+    this.setBubble({ textKey: 'streak.restored', params: { n: r.pet.streak } }, 8000);
+    this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
+  }
+
+  /** Вечерний вопрос (SPEC 4.6, P1): один раз, мягко; ответ — в «Доме питомца» → Дневник. */
+  private maybeEvening(now: number, s: SchedulerState): void {
+    const st = this.d.getState();
+    const day = dayKey(now);
+    if (this.bubble || (s.phase !== 'working' && s.phase !== 'offHours')) return;
+    if (this.lastIdleMs > 60_000) return;
+    if (!shouldAskEvening(st.pet, day, now, this.d.getSettings().smartPause.workHours)) return;
+    const questionKey = questionFor(day);
+    this.d.setState(
+      { ...st, pet: { ...st.pet, evening: { day, questionKey, answered: false } } },
+      0,
+    );
+    this.setBubble(
+      {
+        textKey: questionKey,
+        actions: [
+          { labelKey: 'evening.answer', action: 'evening:answer' },
+          { labelKey: 'evening.skip', action: 'dismiss' },
+        ],
+      },
+      5 * MINUTE,
+    );
+  }
+
+  /** Ответ на вечерний вопрос — локально, в дневник. Без выводов и советов. */
+  answerEvening(text: string): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const day = dayKey(now);
+    const clean = String(text ?? '')
+      .trim()
+      .slice(0, 1000);
+    if (!clean) return;
+    const questionKey =
+      st.pet.evening.day === day && st.pet.evening.questionKey
+        ? st.pet.evening.questionKey
+        : questionFor(day);
+    const pet = addDiary(
+      { ...st.pet, evening: { day, questionKey, answered: true } },
+      { at: now, kind: 'evening', questionKey, text: clean },
+    );
+    this.d.setState({ ...st, pet }, 0);
+    this.d.appendEvent({ type: 'evening_answer', at: now, questionKey, text: clean });
+    this.bubble = null;
+    this.setBubble({ textKey: 'evening.thanks' }, 4000);
+    this.d.onEffects([{ type: 'petReaction', reaction: 'hug' }]);
+  }
+
+  /** Напоминание по времени (SPEC 5.1, P1): облачко с задачей; на умной паузе — после неё. */
+  private maybeRemind(now: number, s: SchedulerState): void {
+    if (this.bubble || s.phase !== 'working') return;
+    const st = this.d.getState();
+    const day = dayKey(now);
+    const already = st.pet.reminded.day === day ? st.pet.reminded.ids : [];
+    const v = todayView(this.d.getTasks(), day, dayKey);
+    const open = v.open.map((i) => i.task);
+    const due = dueReminders(open, now, already);
+    if (!due.length) return;
+    const t = due[0]!;
+    this.d.setState({ ...st, pet: { ...st.pet, reminded: { day, ids: [...already, t.id] } } }, 0);
+    this.setBubble(
+      {
+        textKey: 'task.reminder',
+        params: { title: t.title },
+        actions: [
+          { labelKey: 'task.reminderDone', action: `task:done:${t.id}` },
+          { labelKey: 'task.reminderLater', action: 'dismiss' },
+        ],
+      },
+      5 * MINUTE,
+    );
+    this.d.onEffects([{ type: 'petReaction', reaction: 'bounce' }]);
   }
 
   /**
@@ -450,15 +636,19 @@ export class Engine {
 
   private say(now: number, click: boolean): void {
     const st = this.d.getState();
-    const key = pickLine(
-      {
-        hour: new Date(now).getHours(),
-        pose: needsPose(st.pet.needs),
-        hardDay: st.pet.hardDay,
-        click,
-      },
-      this.random(),
-    );
+    // Раскрытые черты характера добавляют свои реплики (SPEC 4.5); в тяжёлый день — только поддержка.
+    const trait = !st.pet.hardDay && this.random() < 0.25 ? traitLine(st.pet, this.random()) : null;
+    const key =
+      trait ??
+      pickLine(
+        {
+          hour: new Date(now).getHours(),
+          pose: needsPose(st.pet.needs),
+          hardDay: st.pet.hardDay,
+          click,
+        },
+        this.random(),
+      );
     this.lastChatterAt = now;
     this.setBubble({ textKey: key }, 3000);
   }
@@ -479,6 +669,50 @@ export class Engine {
     if (cmd === 'energy') pet = { ...pet, energyToday: pet.energyToday + 10 };
     if (cmd === 'coins') economy = { ...economy, coins: economy.coins + 50 };
     this.d.setState({ ...st, pet, economy }, 0);
+  }
+
+  /** Debug (Неделя 2): приключение сейчас / вернуться, яйцо, вылупить, вечерний вопрос, черта. */
+  debugWeek2(cmd: 'adventure' | 'return' | 'egg' | 'hatch' | 'evening' | 'trait'): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    let pet = st.pet;
+    if (cmd === 'adventure') pet = startAdventure({ ...pet, adventure: null }, now);
+    if (cmd === 'return' && pet.adventure)
+      pet = { ...pet, adventure: { ...pet.adventure, returnsAt: now } };
+    if (cmd === 'egg') pet = giveEgg(pet, 'debug', now, `debug:${now}`);
+    if (cmd === 'hatch')
+      pet = { ...pet, eggs: pet.eggs.map((e) => ({ ...e, careDaysAtReceive: pet.careDays - 3 })) };
+    if (cmd === 'trait') pet = revealTrait(pet, this.random()).pet;
+    if (cmd === 'evening')
+      pet = { ...pet, evening: { day: '', questionKey: null, answered: false } };
+    this.d.setState({ ...st, pet }, 0);
+    if (cmd === 'hatch') {
+      // вылупление — при закрытии дня; в debug — сразу
+      const h = hatchEggs(this.d.getState().pet, now).pet;
+      this.d.setState({ ...this.d.getState(), pet: h }, 0);
+    }
+    if (cmd === 'evening') {
+      this.bubble = null;
+      const day = dayKey(now);
+      const questionKey = questionFor(day);
+      this.d.setState(
+        {
+          ...this.d.getState(),
+          pet: { ...this.d.getState().pet, evening: { day, questionKey, answered: false } },
+        },
+        0,
+      );
+      this.setBubble(
+        {
+          textKey: questionKey,
+          actions: [
+            { labelKey: 'evening.answer', action: 'evening:answer' },
+            { labelKey: 'evening.skip', action: 'dismiss' },
+          ],
+        },
+        5 * MINUTE,
+      );
+    }
   }
 
   private waterCfg(): WaterConfig {
@@ -594,7 +828,26 @@ export class Engine {
         streak: st.pet.streak,
         streakFreezes: st.pet.streakFreezes,
         coins: st.economy.coins,
+        traits: st.pet.revealedTraits,
+        microPets: st.pet.microPets.map((m) => ({ id: m.id, shown: m.shown })),
+        eggs: st.pet.eggs.map((e) => ({
+          daysLeft: Math.max(0, 3 - (st.pet.careDays - e.careDaysAtReceive)),
+        })),
+        owned: st.pet.owned,
+        pantry: st.pet.pantry,
+        streakRestore: st.pet.streakRestore
+          ? { ...st.pet.streakRestore, goal: restoreGoal(st.pet.hardDay) }
+          : null,
       },
+      shop: {
+        wardrobe: WARDROBE.map((i) => ({ ...i })),
+        treats: TREATS.map((t) => ({ id: t.id, price: t.price })),
+      },
+      diary: [...st.pet.diary].reverse().slice(0, 100),
+      evening:
+        st.pet.evening.day === today && !st.pet.evening.answered && st.pet.evening.questionKey
+          ? { questionKey: st.pet.evening.questionKey }
+          : null,
     };
   }
 
@@ -627,6 +880,15 @@ export class Engine {
       hints: settings.tasks.showSelfCareHints ? SELF_CARE_HINTS : [],
       firstAid: this.firstAidView(),
       defaultSize: settings.tasks.defaultSize,
+      journeys: {
+        active: this.d.getTasks().journeys.map((j) => ({
+          id: j.id,
+          titleKey: j.title,
+          completions: j.completions,
+          next: nextMilestone(j),
+        })),
+        available: JOURNEY_IDS.filter((id) => !this.d.getTasks().journeys.some((j) => j.id === id)),
+      },
     };
   }
 
@@ -689,10 +951,165 @@ export class Engine {
     this.saveTasks(tasks);
     const coins = r.paid.reduce((n, p) => n + p.coins, 0);
     const surprise = r.paid.some((p) => p.surprise);
+    const firstTime = done.completed.filter((c) => !c.task.rewardRevoked).map((c) => c.task);
+    const food = done.completed.some((c) => c.kind !== 'subtask' && isFoodTask(c.task.title));
+    this.afterCompletion(firstTime, now);
     this.d.onEffects([
-      { type: 'petReaction', reaction: 'coinCatch' },
+      // SPEC 4.10: отметил задачу про еду — питомец ест рядом.
+      { type: 'petReaction', reaction: food ? 'eat' : 'coinCatch' },
       { type: 'coins', count: coins, surprise },
     ]);
+  }
+
+  /** После первой (не повторной) отметки: яйцо за большую задачу, прогресс Путей. */
+  private afterCompletion(tasks: Task[], now: number): void {
+    let st = this.d.getState();
+    let pet = st.pet;
+    let economy = st.economy;
+    for (const t of tasks) {
+      if (t.size === 'L' && !t.parentId && chance(`egg:${t.id}`, BIG_TASK_EGG_PCT)) {
+        pet = giveEgg(pet, 'bigTask', now, `egg:${t.id}`);
+        pet = addDiary(pet, { at: now, kind: 'egg', params: { source: 'bigTask' } });
+        this.d.appendEvent({ type: 'egg_received', at: now, source: 'bigTask' });
+        this.setBubble({ textKey: 'egg.got' }, 6000);
+      }
+    }
+    // Пути: экземпляр несёт journeyId от шаблона.
+    let ts = this.d.getTasks();
+    for (const t of tasks) {
+      if (!t.journeyId) continue;
+      const j = ts.journeys.find((x) => x.id === t.journeyId);
+      if (!j) continue;
+      const r = addCompletion(j);
+      ts = { ...ts, journeys: ts.journeys.map((x) => (x.id === j.id ? r.journey : x)) };
+      if (!r.reached) continue;
+      const kind = MILESTONE_REWARD[r.reached as keyof typeof MILESTONE_REWARD];
+      const loot: Record<string, string | number | boolean> = {};
+      if (kind === 'coins') {
+        economy = payCoins(economy, MILESTONE_COINS);
+        loot.coins = MILESTONE_COINS;
+      } else if (kind === 'item') {
+        const g = giftItem(pet, this.random());
+        pet = g.pet;
+        if (g.itemId) loot.itemId = g.itemId;
+        else {
+          economy = payCoins(economy, MILESTONE_COINS);
+          loot.coins = MILESTONE_COINS;
+        }
+      } else if (kind === 'egg') {
+        pet = giveEgg(pet, 'journey', now, `journey:${j.id}:${r.reached}`);
+        loot.egg = true;
+        this.d.appendEvent({ type: 'egg_received', at: now, source: 'journey' });
+      }
+      pet = addDiary(pet, {
+        at: now,
+        kind: 'journey',
+        params: { journey: j.title, n: r.reached },
+        loot,
+      });
+      this.setBubble(
+        {
+          textKey: kind === 'line' ? 'journey.master' : 'journey.milestone',
+          params: { n: r.reached },
+        },
+        8000,
+      );
+      this.d.onEffects([{ type: 'petReaction', reaction: 'celebrate' }]);
+    }
+    if (ts !== this.d.getTasks()) this.d.setTasks(ts, TASK_SAVE_MS);
+    st = this.d.getState();
+    if (pet !== st.pet || economy !== st.economy) this.d.setState({ ...st, pet, economy }, 0);
+  }
+
+  // ───────────── Пути (SPEC 5.5) ─────────────
+  startJourney(id: string): void {
+    if (!(JOURNEY_IDS as string[]).includes(id)) return;
+    const jid = id as JourneyTemplate;
+    let ts = this.d.getTasks();
+    if (ts.journeys.some((j) => j.id === jid)) return;
+    const now = this.d.clock.now();
+    const today = dayKey(now);
+    const tr = this.d.t ?? ((k: string) => k);
+    ts = { ...ts, journeys: [...ts.journeys, newJourney(jid, now)] };
+    for (const key of JOURNEY_TEMPLATES[jid]) {
+      const r = createTask(
+        ts,
+        { title: tr(key), size: 'S', recurrence: { kind: 'daily' } },
+        { id: this.d.newId(), instanceId: this.d.newId() },
+        now,
+        today,
+      );
+      const ids = new Set([r.template?.id, r.task?.id].filter(Boolean));
+      ts = {
+        ...r.state,
+        tasks: r.state.tasks.map((t) => (ids.has(t.id) ? { ...t, journeyId: jid } : t)),
+      };
+    }
+    this.saveTasks(ts);
+  }
+
+  /** Сойти с Пути: шаблоны и сегодняшние невыполненные экземпляры уходят, прогресс — тоже. */
+  stopJourney(id: string): void {
+    const ts = this.d.getTasks();
+    if (!ts.journeys.some((j) => j.id === id)) return;
+    this.saveTasks({
+      journeys: ts.journeys.filter((j) => j.id !== id),
+      tasks: ts.tasks.filter((t) => t.journeyId !== id || !!t.doneAt),
+    });
+  }
+
+  // ───────────── Магазин, гардероб, угощения (SPEC 4.9, 4.10) ─────────────
+  buy(id: string): boolean {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const isTreat = TREAT_IDS.includes(id);
+    const r = isTreat
+      ? buyTreat(st.pet, economyForDay(st.economy, dayKey(now)), id)
+      : buyItem(st.pet, economyForDay(st.economy, dayKey(now)), id);
+    if (!r.ok) return false;
+    let pet = r.pet;
+    if (!isTreat) pet = (toggleItem(pet, id) as { ok: true; pet: typeof pet }).pet; // купил — сразу надел
+    this.d.setState({ ...st, pet, economy: r.economy }, 0);
+    this.d.appendEvent({ type: 'purchase', at: now, itemId: id, price: r.price });
+    if (!isTreat) this.d.onEffects([{ type: 'petReaction', reaction: 'bounce' }]);
+    return true;
+  }
+
+  toggleWear(id: string): void {
+    const st = this.d.getState();
+    const r = toggleItem(st.pet, id);
+    if (!r.ok) return;
+    this.d.setState({ ...st, pet: r.pet }, 0);
+    this.d.onEffects([{ type: 'petReaction', reaction: 'bounce' }]);
+  }
+
+  /** Угостить из кладовки: ест и радуется; любимое — раскрывает черту «любимая еда». */
+  feed(treatId: string): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const r = takeTreat(st.pet, treatId);
+    if (!r.ok) return;
+    let pet = r.pet;
+    const fav = favoriteFood(pet, TREAT_IDS);
+    let textKey = 'treat.yum';
+    if (treatId === fav) {
+      const tr = revealTrait(pet, 0, 'favoriteFood');
+      pet = tr.pet;
+      if (tr.traitId) {
+        pet = addDiary(pet, { at: now, kind: 'trait', loot: { traitId: tr.traitId } });
+        this.d.appendEvent({ type: 'trait_revealed', at: now, traitId: tr.traitId });
+        textKey = 'treat.favorite';
+      } else textKey = 'treat.favoriteAgain';
+    }
+    this.d.setState({ ...st, pet }, 0);
+    this.setBubble({ textKey, params: { food: `treat.${treatId}` } }, 5000);
+    this.d.onEffects([{ type: 'petReaction', reaction: 'eat' }]);
+  }
+
+  toggleMicroPet(index: number): void {
+    const st = this.d.getState();
+    const pet = toggleShown(st.pet, Math.floor(index));
+    if (pet !== st.pet) this.d.setState({ ...st, pet }, 0);
   }
 
   uncompleteTask(id: string): void {
@@ -852,6 +1269,7 @@ export class Engine {
         idleMs: this.lastIdleMs,
         nightNoInput: hour < 6 && this.lastIdleMs > 60_000,
         needs: st.pet.needs,
+        adventure: !!st.pet.adventure,
       });
     return {
       debug: this.d.debug,
@@ -868,7 +1286,12 @@ export class Engine {
         needs: st.pet.needs,
         careDays: st.pet.careDays,
         streak: st.pet.streak,
+        adventure: st.pet.adventure ? { returnsAt: st.pet.adventure.returnsAt } : null,
+        microPets: settings.pet.showMicroPets
+          ? st.pet.microPets.filter((m) => m.shown).map((m) => m.id)
+          : [],
       },
+      island: { enabled: !settings.general.minimalWidget, timeOfDay: timeOfDay(now) },
       tasksToday: todayView(this.d.getTasks(), dayKey(now), dayKey).counts,
       economy: {
         coins: st.economy.coins,

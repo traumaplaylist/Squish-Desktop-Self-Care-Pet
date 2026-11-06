@@ -306,6 +306,8 @@ export type BubbleAction =
 export interface Bubble {
   textKey: string;
   params?: Record<string, string | number>;
+  /** Дополнительные i18n-ключи после текста (история приключения: место, событие, находка). */
+  parts?: string[];
   actions?: { labelKey: string; action: BubbleAction }[];
 }
 
@@ -350,6 +352,11 @@ export interface TasksView {
   /** «Аптечка» (SPEC 5.6) — только в тяжёлый день. */
   firstAid: { id: string; labelKey: string; done: boolean }[] | null;
   defaultSize: TaskSize;
+  /** «Пути» (SPEC 5.5): начатые и доступные. */
+  journeys: {
+    active: { id: string; titleKey: string; completions: number; next: number | null }[];
+    available: string[];
+  };
 }
 
 /** «Дом питомца» (SPEC 2.3). */
@@ -370,7 +377,24 @@ export interface HomeStats {
     streak: number;
     streakFreezes: number;
     coins: number;
+    traits: TraitId[];
+    microPets: { id: MicroPetId; shown: boolean }[];
+    eggs: { daysLeft: number }[];
+    owned: AccessoryId[];
+    pantry: Record<string, number>;
+    streakRestore: { lost: number; until: Millis; goal: number } | null;
   };
+  /** Магазин: постоянный ассортимент (SPEC 4.9, 4.10). */
+  shop: {
+    wardrobe: { id: AccessoryId; slot: string; price: number }[];
+    treats: { id: string; price: number }[];
+  };
+  /** Дневник: новые сверху (SPEC 2.3). */
+  diary: DiaryEntry[];
+  /** Вечерний вопрос, если ещё не отвечен сегодня. */
+  evening: { questionKey: string } | null;
+  /** Какую вкладку открыть (облачко «ответить» / «в дневник»), один раз. */
+  openTab?: 'today' | 'week' | 'pet' | 'diary' | 'shop';
 }
 
 /** Снапшот, который main рассылает во все окна. */
@@ -391,7 +415,13 @@ export interface Snapshot {
     needs: Needs;
     careDays: number;
     streak: number;
+    /** Ушёл в приключение — вернётся к этому времени (SPEC 4.4). */
+    adventure: { returnsAt: Millis } | null;
+    /** Микро-питомцы на виду (до двух). */
+    microPets: MicroPetId[];
   };
+  /** Островок под питомцем (SPEC 4.10): выключен в «минималистичном виджете». */
+  island: { enabled: boolean; timeOfDay: 'morning' | 'day' | 'evening' | 'night' };
   tasksToday: { done: number; total: number };
   economy: { coins: number; energyToday: number; goal: number };
   sounds: { enabled: boolean; volume: number };
