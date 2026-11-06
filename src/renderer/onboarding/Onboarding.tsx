@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Palette, Strictness } from '../../core/types';
+import { SPECIES, type Palette, type SpeciesId, type Strictness } from '../../core/types';
 import { createPetRenderer } from '../pet/createPetRenderer';
 import type { PetRenderer } from '../pet/PetRenderer';
 import { useI18n } from '../shared/useI18n';
@@ -13,6 +13,7 @@ export function Onboarding() {
   const [hatched, setHatched] = useState(false);
   const [name, setName] = useState('');
   const [palette, setPalette] = useState<Palette>('mint');
+  const [species, setSpecies] = useState<SpeciesId>('blob');
   const [glasses, setGlasses] = useState(8);
   const [strictness, setStrictness] = useState<Strictness>('normal');
   const [tasks, setTasks] = useState<string[]>(['', '', '']);
@@ -21,21 +22,26 @@ export function Onboarding() {
   const pet = useRef<PetRenderer | null>(null);
 
   useEffect(() => {
-    if (!hatched || !host.current || pet.current) return;
-    pet.current = createPetRenderer('svgBlob', host.current);
-    pet.current.setStage('baby');
-    pet.current.setState('happy');
-    void pet.current.play('celebrate');
+    if (!hatched || !host.current) return;
+    const p = createPetRenderer(species, host.current);
+    pet.current = p;
+    p.setStage('baby');
+    p.setPalette(palette);
+    p.setState('happy');
+    void p.play('celebrate');
     return () => {
-      pet.current?.destroy();
-      pet.current = null;
+      p.destroy();
+      if (pet.current === p) pet.current = null;
     };
-  }, [hatched]);
+    // палитра применяется отдельным эффектом — без пересоздания
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hatched, species]);
   useEffect(() => pet.current?.setPalette(palette), [palette, hatched]);
 
   const finish = () =>
     window.squish.send('onboarding:finish', {
-      name: name.trim() || t('pet.defaultName'),
+      name: name.trim() || t(species === 'blob' ? 'pet.defaultName' : `species.${species}.name`),
+      species,
       palette,
       goalGlasses: glasses,
       strictness,
@@ -85,23 +91,38 @@ export function Onboarding() {
                 <input
                   type="text"
                   maxLength={24}
-                  placeholder={t('pet.defaultName')}
+                  placeholder={t(
+                    species === 'blob' ? 'pet.defaultName' : `species.${species}.name`,
+                  )}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoFocus
                 />
               </label>
-              <div className="chips colors">
-                {(['mint', 'peach', 'lavender'] as Palette[]).map((p) => (
+              <div className="chips species">
+                {SPECIES.map((sp) => (
                   <button
-                    key={p}
-                    className={`chip color-${p}${p === palette ? ' on' : ''}`}
-                    onClick={() => setPalette(p)}
+                    key={sp}
+                    className={`chip${sp === species ? ' on' : ''}`}
+                    onClick={() => setSpecies(sp)}
                   >
-                    {t(`palette.${p}`)}
+                    {t(`species.${sp}`)}
                   </button>
                 ))}
               </div>
+              {species === 'blob' && (
+                <div className="chips colors">
+                  {(['mint', 'peach', 'lavender'] as Palette[]).map((p) => (
+                    <button
+                      key={p}
+                      className={`chip color-${p}${p === palette ? ' on' : ''}`}
+                      onClick={() => setPalette(p)}
+                    >
+                      {t(`palette.${p}`)}
+                    </button>
+                  ))}
+                </div>
+              )}
             </>
           )}
           <Nav t={t} next={hatched ? () => setStep(1) : undefined} />

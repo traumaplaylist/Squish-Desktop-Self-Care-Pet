@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getExercise } from '../../core/exercises';
 import type { Snapshot } from '../../core/types';
-import { createPetRenderer } from '../pet/createPetRenderer';
-import type { PetRenderer } from '../pet/PetRenderer';
+import { applyLook, usePetRenderer } from '../pet/usePetRenderer';
 import { useI18n } from '../shared/useI18n';
 
 const RING_R = 54;
@@ -18,7 +17,8 @@ export function Overlay({ primary }: { primary: boolean }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [phase, setPhase] = useState<'in' | 'shown' | 'done' | 'out'>('in');
   const hostRef = useRef<HTMLDivElement>(null);
-  const petRef = useRef<PetRenderer | null>(null);
+  // Питомец ×3 — только на основном мониторе; вид зверя — из снапшота.
+  const petRef = usePetRenderer(hostRef, primary ? (snap?.pet.species ?? null) : null);
 
   useEffect(() => {
     void window.squish.invoke('app:getSnapshot').then(setSnap);
@@ -35,18 +35,7 @@ export function Overlay({ primary }: { primary: boolean }) {
       offs.forEach((o) => o());
       cancelAnimationFrame(raf);
     };
-  }, []);
-
-  // Питомец ×3 — только на основном мониторе.
-  useEffect(() => {
-    if (!primary || !hostRef.current) return;
-    const pet = createPetRenderer('svgBlob', hostRef.current);
-    petRef.current = pet;
-    return () => {
-      pet.destroy();
-      petRef.current = null;
-    };
-  }, [primary]);
+  }, [petRef]);
 
   // Последний известный перерыв держим, чтобы во время «радости» и затухания не мигал пустой экран.
   const lastBreak = useRef<Snapshot['scheduler']['break']>(null);
@@ -55,13 +44,12 @@ export function Overlay({ primary }: { primary: boolean }) {
 
   useEffect(() => {
     if (!snap || !petRef.current) return;
-    petRef.current.setPalette(snap.pet.palette);
-    petRef.current.setStage(snap.pet.stage);
+    applyLook(petRef.current, snap);
     // Досидел — радуется; во время упражнения — анимация упражнения.
     petRef.current.setState(
       phase !== 'done' && snap.pet.visual.startsWith('onBreak:') ? snap.pet.visual : 'happy',
     );
-  }, [snap, phase]);
+  }, [snap, phase, petRef]);
 
   const opacity = snap?.overlayOpacity ?? 0.8;
   const v = snap?.scheduler;

@@ -20,7 +20,14 @@ import { DEFAULT_SETTINGS, defaultState, defaultTasks } from '../core/defaults';
 import type { Effect } from '../core/events';
 import type { ProbeResult, RendererCommands, RendererInvokes } from '../core/ipc';
 import { classifyNotificationState } from '../core/notificationState';
-import type { PersistedState, PersistedTasks, Settings, Snapshot } from '../core/types';
+import {
+  SPECIES,
+  type SpeciesId,
+  type PersistedState,
+  type PersistedTasks,
+  type Settings,
+  type Snapshot,
+} from '../core/types';
 import { Engine } from './engine';
 import { getDict, setLang, t } from './i18n';
 import { validateSettings } from '../core/settingsSchema';
@@ -139,6 +146,14 @@ async function main(): Promise<void> {
   const SKIP_ONBOARDING = process.env['SQUISH_SKIP_ONBOARDING'] === '1';
   if (SKIP_ONBOARDING && !stateStore.get().onboardingDone) {
     stateStore.set({ ...stateStore.get(), onboardingDone: true }, 0);
+  }
+  // Для тестов и замеров: SQUISH_SPECIES=hamster — вид питомца при старте.
+  const forcedSpecies = process.env['SQUISH_SPECIES'] as SpeciesId | undefined;
+  if (forcedSpecies && SPECIES.includes(forcedSpecies)) {
+    stateStore.set(
+      { ...stateStore.get(), pet: { ...stateStore.get().pet, species: forcedSpecies } },
+      0,
+    );
   }
 
   await app.whenReady();
@@ -596,11 +611,18 @@ async function main(): Promise<void> {
     if (!r || typeof r.name !== 'string') return;
     const st = stateStore.get();
     const palette = ['mint', 'peach', 'lavender'].includes(r.palette) ? r.palette : 'mint';
+    const species = SPECIES.includes(r.species) ? r.species : 'blob';
     stateStore.set(
       {
         ...st,
         onboardingDone: true,
-        pet: { ...st.pet, name: r.name.trim().slice(0, 24) || st.pet.name, palette, stage: 'baby' },
+        pet: {
+          ...st.pet,
+          name: r.name.trim().slice(0, 24) || st.pet.name,
+          species,
+          palette,
+          stage: 'baby',
+        },
       },
       0,
     );
@@ -615,6 +637,19 @@ async function main(): Promise<void> {
     closePage('onboarding');
     widget.win.showInactive();
     widget.win.webContents.send('pet:play', 'celebrate');
+    publish();
+  });
+  on('debug:species', (sp) => {
+    if (!DEBUG || !SPECIES.includes(sp)) return;
+    const s = stateStore.get();
+    stateStore.set({ ...s, pet: { ...s.pet, species: sp } }, 0);
+    publish();
+  });
+  on('debug:outfit', (o) => {
+    if (!DEBUG) return;
+    const s = stateStore.get();
+    const accessories = typeof o === 'string' && /^[a-z]+$/.test(o) ? [`outfit:${o}`] : [];
+    stateStore.set({ ...s, pet: { ...s.pet, accessories } }, 0);
     publish();
   });
   on('debug:pet', (cmd) => {

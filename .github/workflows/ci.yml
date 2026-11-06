@@ -53,10 +53,17 @@ jobs:
         run: node scripts/e2e-pet.mjs
       - name: E2E onboarding, settings (live), pet's home
         run: node scripts/e2e-onboarding.mjs
+      - name: E2E species (hamster from parts)
+        run: node scripts/e2e-species.mjs
       - name: Idle CPU / RAM on Windows (packaged app)
         run: node scripts/measure-idle.mjs
         env:
           SQUISH_EXE: dist/win-unpacked/Squish.exe
+      - name: Idle CPU / RAM on Windows — hamster
+        run: node scripts/measure-idle.mjs
+        env:
+          SQUISH_EXE: dist/win-unpacked/Squish.exe
+          SQUISH_SPECIES: hamster
       - name: Install → run → uninstall (silent)
         shell: pwsh
         run: |

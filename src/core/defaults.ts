@@ -40,6 +40,7 @@ export function defaultState(now: number): PersistedState {
   return {
     pet: {
       name: 'Сквиш',
+      species: 'blob',
       palette: 'mint',
       stage: 'baby',
       careDays: 0,

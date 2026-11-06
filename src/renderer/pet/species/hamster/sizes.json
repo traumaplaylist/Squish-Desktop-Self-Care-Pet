@@ -1,0 +1,20 @@
+{
+  "arm-l": [100, 163],
+  "arm-r": [99, 163],
+  "blush": [221, 58],
+  "body": [261, 288],
+  "cape-back": [400, 290],
+  "cape-front": [400, 241],
+  "eyes-closed": [194, 27],
+  "eyes-happy": [196, 38],
+  "eyes-open": [202, 75],
+  "eyes-sleepy": [214, 73],
+  "feet": [224, 48],
+  "hat": [400, 320],
+  "mouth-flat": [73, 11],
+  "mouth-o": [43, 42],
+  "mouth-open": [73, 60],
+  "mouth-smile": [100, 34],
+  "shadow": [216, 43],
+  "wand": [127, 378]
+}

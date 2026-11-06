@@ -1,14 +1,5 @@
-import { createRoot, type Root } from 'react-dom/client';
-import type {
-  AccessoryId,
-  GrowthStage,
-  MicroPetId,
-  Palette,
-  PetReaction,
-  PetVisualState,
-} from '../../core/types';
-import type { PetRenderer } from './PetRenderer';
-import { BREATH_TICK_MS, breathTransform } from './breath';
+import type { PetVisualState } from '../../core/types';
+import { AnimatedPetRenderer, type PetViewProps } from './AnimatedPetRenderer';
 import { PALETTES } from './palettes';
 import './blob.css';
 
@@ -25,26 +16,8 @@ const DRAWN: ReadonlySet<PetVisualState> = new Set<PetVisualState>([
   'onBreak:stretchUp',
   'onBreak:breathe',
 ]);
-const REACTION_MS: Partial<Record<PetReaction, number>> = {
-  bounce: 650,
-  celebrate: 1500,
-  drink: 1400,
-  coinCatch: 900,
-  hug: 1600,
-  straighten: 900,
-  purr: 1800,
-  giggle: 1100,
-  dizzy: 1400,
-};
 
-interface BlobProps {
-  state: PetVisualState;
-  stage: GrowthStage;
-  palette: Palette;
-  cozy: boolean;
-  blinking: boolean;
-  reaction: { name: PetReaction; key: number } | null;
-}
+type BlobProps = PetViewProps;
 
 type FaceState = PetVisualState | 'purr' | 'giggle' | 'dizzy';
 
@@ -279,148 +252,10 @@ function Blob(p: BlobProps) {
   );
 }
 
-export class SvgBlobRenderer implements PetRenderer {
-  private readonly root: Root;
-  private props: BlobProps = {
-    state: 'idle',
-    stage: 'baby',
-    palette: 'mint',
-    cozy: false,
-    blinking: false,
-    reaction: null,
-  };
-  private paused = false;
-  private blinkTimer: number | null = null;
-  private breathTimer: number | null = null;
-  private readonly breathStart = performance.now();
-  private reactionKey = 0;
-
-  constructor(private readonly container: HTMLElement) {
-    this.root = createRoot(container);
-    this.render();
-    this.scheduleBlink();
-    this.startBreath();
-  }
-
-  setState(state: PetVisualState): void {
-    if (state === this.props.state) return;
-    if (!DRAWN.has(state)) console.debug(`[pet] TODO: состояние «${state}» пока рисуется как idle`);
-    this.update({ state });
-  }
-
-  play(reaction: PetReaction): Promise<void> {
-    if (this.paused) return Promise.resolve();
-    if (reaction === 'blink') return this.blinkOnce();
-    const ms = REACTION_MS[reaction];
-    if (ms === undefined) {
-      console.debug(`[pet] TODO: реакция «${reaction}» появится позже`);
-      return Promise.resolve();
-    }
-    const key = ++this.reactionKey;
-    this.update({ reaction: { name: reaction, key } });
-    return new Promise((resolve) => {
-      window.setTimeout(() => {
-        if (this.props.reaction?.key === key) this.update({ reaction: null });
-        resolve();
-      }, ms);
-    });
-  }
-
-  setAccessories(_ids: AccessoryId[]): void {
-    /* TODO P1 (гардероб, SPEC 4.9) */
-  }
-
-  setStage(stage: GrowthStage): void {
-    if (stage !== this.props.stage) this.update({ stage });
-  }
-
-  setMicroPets(_ids: MicroPetId[]): void {
-    /* TODO P1 (микро-питомцы, SPEC 4.8) */
-  }
-
-  setPaused(paused: boolean): void {
-    if (paused === this.paused) return;
-    this.paused = paused;
-    this.container.classList.toggle('pet-paused', paused);
-    if (paused) {
-      this.clearBlink();
-      this.stopBreath();
-    } else {
-      this.scheduleBlink();
-      this.startBreath();
-    }
-  }
-
-  setPalette(palette: Palette): void {
-    if (palette !== this.props.palette) this.update({ palette });
-  }
-
-  setCozy(cozy: boolean): void {
-    if (cozy !== this.props.cozy) this.update({ cozy });
-  }
-
-  lookAt(dir: { x: number; y: number } | null): void {
-    // Без перерисовки React: только CSS-переменные.
-    this.container.style.setProperty('--eye-x', `${(dir?.x ?? 0) * 5}px`);
-    this.container.style.setProperty('--eye-y', `${(dir?.y ?? 0) * 5}px`);
-  }
-
-  destroy(): void {
-    this.clearBlink();
-    this.stopBreath();
-    this.root.unmount();
-  }
-
-  private update(patch: Partial<BlobProps>): void {
-    this.props = { ...this.props, ...patch };
-    this.render();
-  }
-
-  private render(): void {
-    this.root.render(<Blob {...this.props} />);
-  }
-
-  private startBreath(): void {
-    this.stopBreath();
-    this.breathTimer = window.setInterval(() => {
-      const el = this.container.querySelector<HTMLElement>('.breath');
-      if (el)
-        el.style.transform = breathTransform(
-          this.props.state,
-          performance.now() - this.breathStart,
-        );
-    }, BREATH_TICK_MS);
-  }
-
-  private stopBreath(): void {
-    if (this.breathTimer !== null) window.clearInterval(this.breathTimer);
-    this.breathTimer = null;
-  }
-
-  /** Случайное моргание раз в 3–7 с (SPEC 7.2). */
-  private scheduleBlink(): void {
-    this.clearBlink();
-    const delay = 3000 + Math.random() * 4000;
-    this.blinkTimer = window.setTimeout(() => {
-      void this.blinkOnce().then(() => {
-        if (!this.paused) this.scheduleBlink();
-      });
-    }, delay);
-  }
-
-  private clearBlink(): void {
-    if (this.blinkTimer !== null) window.clearTimeout(this.blinkTimer);
-    this.blinkTimer = null;
-  }
-
-  private blinkOnce(): Promise<void> {
-    if (this.props.state === 'sleeping' || this.props.state === 'happy') return Promise.resolve();
-    this.update({ blinking: true });
-    return new Promise((resolve) =>
-      window.setTimeout(() => {
-        this.update({ blinking: false });
-        resolve();
-      }, 140),
-    );
+/** v1: круглый SVG-блоб «Сквиш» (SPEC 7.2). */
+export class SvgBlobRenderer extends AnimatedPetRenderer {
+  protected readonly eyeShift = 5;
+  protected view(p: PetViewProps) {
+    return <Blob {...p} />;
   }
 }

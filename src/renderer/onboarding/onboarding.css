@@ -134,3 +134,11 @@
   justify-content: space-between;
   padding-top: 18px;
 }
+
+.species {
+  margin-bottom: 8px;
+}
+.species .chip.on {
+  outline: 2px solid var(--accent-strong);
+  background: var(--card);
+}

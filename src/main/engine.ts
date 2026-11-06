@@ -586,6 +586,8 @@ export class Engine {
       }),
       pet: {
         name: st.pet.name,
+        species: st.pet.species,
+        accessories: st.pet.accessories,
         stage: st.pet.stage,
         palette: st.pet.palette,
         careDays: st.pet.careDays,
@@ -857,9 +859,11 @@ export class Engine {
       theme: this.d.theme?.() ?? 'light',
       pet: {
         name: st.pet.name,
+        species: st.pet.species,
         palette: st.pet.palette,
         stage: st.pet.stage,
         visual,
+        accessories: st.pet.accessories,
         cozy: st.pet.hardDay,
         needs: st.pet.needs,
         careDays: st.pet.careDays,

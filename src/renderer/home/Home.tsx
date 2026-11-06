@@ -203,12 +203,13 @@ function Pet({ s, t }: { s: HomeStats; t: T }) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!host.current) return;
-    const pet = createPetRenderer('svgBlob', host.current);
+    const pet = createPetRenderer(s.pet.species, host.current);
     pet.setStage(s.pet.stage);
     pet.setPalette(s.pet.palette);
+    pet.setAccessories(s.pet.accessories);
     pet.setState('happy');
     return () => pet.destroy();
-  }, [s.pet.stage, s.pet.palette]);
+  }, [s.pet.species, s.pet.stage, s.pet.palette, s.pet.accessories]);
   return (
     <div className="card pet-card">
       <div className="pet-host" ref={host} />

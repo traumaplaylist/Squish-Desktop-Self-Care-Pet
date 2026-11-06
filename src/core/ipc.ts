@@ -13,6 +13,7 @@ import type {
   Palette as PaletteT,
   Settings,
   Snapshot,
+  SpeciesId,
   Strictness,
   SuppressReason,
   TasksView,
@@ -55,6 +56,7 @@ export interface MainEvents {
 
 export interface OnboardingResult {
   name: string;
+  species: SpeciesId;
   palette: PaletteT;
   goalGlasses: number;
   strictness: Strictness;
@@ -98,6 +100,9 @@ export interface RendererCommands {
   'settings:resetProgress': null;
   'onboarding:finish': OnboardingResult;
   'debug:pet': 'careDay' | 'stageUp' | 'needsLow' | 'energy' | 'coins';
+  'debug:species': SpeciesId;
+  /** Надеть/снять наряд (до гардероба — только Debug). */
+  'debug:outfit': string | null;
   'bubble:action': BubbleAction;
   'debug:setVisual': PetVisualState | null;
   'debug:setSpeed': number;
@@ -159,6 +164,8 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'settings:resetProgress': true,
   'onboarding:finish': true,
   'debug:pet': true,
+  'debug:species': true,
+  'debug:outfit': true,
   'bubble:action': true,
   'debug:setVisual': true,
   'debug:setSpeed': true,

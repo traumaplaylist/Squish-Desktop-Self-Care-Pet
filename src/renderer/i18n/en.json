@@ -337,5 +337,12 @@
   "data.err.bad-tasks": "The file is damaged (tasks)",
   "data.err.bad-events": "The file is damaged (history)",
   "data.err.read-failed": "Could not read the file",
-  "data.err.write-failed": "Could not save the file"
+  "data.err.write-failed": "Could not save the file",
+  "species.blob": "Squish",
+  "species.hamster": "Bun hamster",
+  "species.hamster.name": "Bun",
+  "debug.species": "Pet species",
+  "debug.outfit": "Outfit",
+  "outfit.none": "no outfit",
+  "outfit.wizard": "Wizard"
 }

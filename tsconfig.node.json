@@ -1,8 +1,12 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022"],
-    "types": ["node"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node"
+    ],
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
   "include": [
@@ -11,6 +15,11 @@
     "src/preload/**/*",
     "src/renderer/i18n/*.json",
     "electron.vite.config.ts",
-    "vitest.config.mts"
+    "vitest.config.mts",
+    "src/renderer/**/*.test.ts",
+    "src/renderer/pet/rig.ts",
+    "src/renderer/pet/breath.ts",
+    "src/renderer/pet/species/*/rig.ts",
+    "src/renderer/pet/species/*/sizes.json"
   ]
 }

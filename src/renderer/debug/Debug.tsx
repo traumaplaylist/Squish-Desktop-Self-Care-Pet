@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ProbeResult } from '../../core/ipc';
+import { SPECIES } from '../../core/types';
 import type {
   Palette,
   PetReaction,
@@ -170,6 +171,32 @@ export function Debug() {
           {d?.simSuppression && (
             <span>осталось {mmss(Math.max(0, d.simSuppression.untilSec))}</span>
           )}
+        </div>
+      </section>
+      <section>
+        <h2>{t('debug.species')}</h2>
+        <div className="row">
+          {SPECIES.map((sp) => (
+            <button
+              key={sp}
+              className={snap?.pet.species === sp ? 'on' : ''}
+              onClick={() => window.squish.send('debug:species', sp)}
+            >
+              {t(`species.${sp}`)}
+            </button>
+          ))}
+          <span style={{ width: 12 }} />
+          {[null, 'wizard'].map((o) => (
+            <button
+              key={o ?? 'none'}
+              className={
+                (snap?.pet.accessories[0] ?? null) === (o ? `outfit:${o}` : null) ? 'on' : ''
+              }
+              onClick={() => window.squish.send('debug:outfit', o)}
+            >
+              {t(o ? `outfit.${o}` : 'outfit.none')}
+            </button>
+          ))}
         </div>
       </section>
       <section>

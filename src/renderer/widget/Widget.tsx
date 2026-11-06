@@ -1,40 +1,50 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Snapshot } from '../../core/types';
-import { createPetRenderer } from '../pet/createPetRenderer';
-import type { PetRenderer } from '../pet/PetRenderer';
+import { applyLook, usePetRenderer } from '../pet/usePetRenderer';
 import { useI18n } from '../shared/useI18n';
 
 const DRAG_THRESHOLD_PX = 4;
 
 export function Widget() {
   const hostRef = useRef<HTMLDivElement>(null);
-  const petRef = useRef<PetRenderer | null>(null);
   const [dragging, setDragging] = useState(false);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [hover, setHover] = useState(false);
   const [flights, setFlights] = useState<{ id: number; n: number; surprise: boolean }[]>([]);
   const t = useI18n();
+  const snapRef = useRef<Snapshot | null>(null);
 
-  // Питомец: создаём один раз, дальше только команды через PetRenderer.
+  // Питомец: создаётся под вид зверя из снапшота; дальше — только команды через PetRenderer.
+  const petRef = usePetRenderer(hostRef, snap?.pet.species ?? null, (pet) => {
+    if (snapRef.current) {
+      applyLook(pet, snapRef.current);
+      pet.setState(snapRef.current.pet.visual);
+    }
+    const offs = [
+      window.squish.on('pet:play', (r) => void pet.play(r)),
+      window.squish.on('pet:eyes', (d) => pet.lookAt(d)),
+      window.squish.on('pet:paused', (p) => pet.setPaused(p)),
+    ];
+    const onVisibility = () => pet.setPaused(document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      offs.forEach((off) => off());
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  });
+
   useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const pet = createPetRenderer('svgBlob', host);
-    petRef.current = pet;
-
     const apply = (s: Snapshot) => {
+      snapRef.current = s;
       setSnap(s);
-      pet.setPalette(s.pet.palette);
-      pet.setStage(s.pet.stage);
-      pet.setCozy(s.pet.cozy);
+      const pet = petRef.current;
+      if (!pet) return;
+      applyLook(pet, s);
       pet.setState(s.pet.visual);
     };
     void window.squish.invoke('app:getSnapshot').then(apply);
     const offs = [
       window.squish.on('snapshot', apply),
-      window.squish.on('pet:play', (r) => void pet.play(r)),
-      window.squish.on('pet:eyes', (d) => pet.lookAt(d)),
-      window.squish.on('pet:paused', (p) => pet.setPaused(p)),
       window.squish.on('pet:coins', ({ count, surprise }) => {
         // Монетки влетают слева (со стороны окна задач) и падают в питомца.
         const f = { id: Date.now() + Math.random(), n: Math.min(8, Math.max(1, count)), surprise };
@@ -42,15 +52,8 @@ export function Widget() {
         window.setTimeout(() => setFlights((l) => l.filter((x) => x.id !== f.id)), 1400);
       }),
     ];
-    const onVisibility = () => pet.setPaused(document.hidden);
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      offs.forEach((off) => off());
-      document.removeEventListener('visibilitychange', onVisibility);
-      pet.destroy();
-      petRef.current = null;
-    };
-  }, []);
+    return () => offs.forEach((off) => off());
+  }, [petRef]);
 
   // Прозрачные места пропускают клики: сообщаем main, над питомцем ли курсор.
   useEffect(() => {

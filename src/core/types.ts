@@ -74,6 +74,9 @@ export type PetAnimation = 'lookFar' | 'stretchUp' | 'breathe' | 'neckRoll' | 'w
 // ───────────── Питомец (SPEC 4, 7) ─────────────
 export type GrowthStage = 'egg' | 'baby' | 'teen' | 'adult' | 'wise';
 export type Palette = 'mint' | 'peach' | 'lavender';
+/** Вид питомца: SVG-блоб «Сквиш» или зверь из деталей (renderer/pet/species). */
+export type SpeciesId = 'blob' | 'hamster';
+export const SPECIES: readonly SpeciesId[] = ['blob', 'hamster'];
 
 export type PetVisualState =
   | 'idle'
@@ -113,6 +116,7 @@ export interface Needs {
 
 export interface PetState {
   name: string;
+  species: SpeciesId;
   palette: Palette;
   stage: GrowthStage;
   careDays: number;
@@ -325,6 +329,8 @@ export interface HomeStats {
   week: (import('./stats').DayStats & { score: number | null })[];
   pet: {
     name: string;
+    species: SpeciesId;
+    accessories: AccessoryId[];
     stage: GrowthStage;
     palette: Palette;
     careDays: number;
@@ -342,9 +348,12 @@ export interface Snapshot {
   theme: 'light' | 'dark';
   pet: {
     name: string;
+    species: SpeciesId;
     palette: Palette;
     stage: GrowthStage;
     visual: PetVisualState;
+    /** Надетое (R0/SPEC 4.9): 'outfit:wizard' и т. п. */
+    accessories: AccessoryId[];
     cozy: boolean;
     needs: Needs;
     careDays: number;

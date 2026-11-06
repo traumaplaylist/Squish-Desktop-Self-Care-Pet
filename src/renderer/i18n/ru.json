@@ -337,5 +337,12 @@
   "data.err.bad-tasks": "Файл повреждён (задачи)",
   "data.err.bad-events": "Файл повреждён (история)",
   "data.err.read-failed": "Не получилось прочитать файл",
-  "data.err.write-failed": "Не получилось сохранить файл"
+  "data.err.write-failed": "Не получилось сохранить файл",
+  "species.blob": "Сквиш",
+  "species.hamster": "Хомяк-булочка",
+  "species.hamster.name": "Булочка",
+  "debug.species": "Вид питомца",
+  "debug.outfit": "Наряд",
+  "outfit.none": "без наряда",
+  "outfit.wizard": "Волшебник"
 }

@@ -1,0 +1,22 @@
+/* Зверь из деталей: всё, что отличается от блоба. Основные анимации — в blob.css. */
+.pet.layered .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.pet.layered.blink .eye {
+  transform: scaleY(0.08);
+}
+/* Упражнение «дыхание» у блоба сжимает глаза через .eye — здесь глаза и так закрыты. */
+.pet.layered.state-onBreak-breathe .eye {
+  transform: none;
+}
+/* Лапки: точка вращения задана ригом (inline transform-origin). */
+.pet.layered .arm {
+  transform-box: view-box;
+}
+.pet.layered .glass {
+  transform-box: view-box;
+}
+.pet.layered image {
+  image-rendering: auto;
+}

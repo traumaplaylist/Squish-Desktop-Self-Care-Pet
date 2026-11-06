@@ -5,7 +5,7 @@
 import { defaultState } from './defaults';
 import type { PersistedState } from './types';
 
-export const STATE_VERSION = 5;
+export const STATE_VERSION = 6;
 
 export function stateMigrations(now: () => number): Record<number, (d: unknown) => unknown> {
   const def = () => defaultState(now());
@@ -24,6 +24,11 @@ export function stateMigrations(now: () => number): Record<number, (d: unknown) 
     },
     // v4 → v5 (День 6): активное время за день для статистики.
     4: (d) => ({ ...(d as PersistedState), activity: def().activity }),
+    // v5 → v6: вид питомца (блоб по умолчанию — у кого уже был питомец, он не меняется).
+    5: (d) => {
+      const s = d as PersistedState;
+      return { ...s, pet: { ...s.pet, species: s.pet.species ?? 'blob' } };
+    },
   };
 }
 
