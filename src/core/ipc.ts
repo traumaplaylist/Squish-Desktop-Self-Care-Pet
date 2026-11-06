@@ -68,6 +68,11 @@ export interface OnboardingResult {
   strictness: Strictness;
   tasks: string[];
   autostart: boolean;
+  /** Новое (по мотивам Finch): черта на выбор, цели, стартовый план (i18n-ключи), Пути. */
+  trait?: string;
+  goals?: unknown;
+  plan?: string[];
+  journeys?: string[];
 }
 
 /** renderer → main (fire-and-forget) */
@@ -111,6 +116,8 @@ export interface RendererCommands {
   'micro:toggle': number;
   /** Ответ на вечерний вопрос (SPEC 4.6). */
   'evening:answer': string;
+  /** «Мои цели» в настройках: сохранить и перестроить связанные настройки. */
+  'goals:update': unknown;
   'app:open': 'home' | 'settings' | 'tasks';
   'settings:update': SettingsPatch;
   /** Сброс прогресса (окно уже дважды спросило). */
@@ -142,7 +149,12 @@ export interface RendererInvokes {
   'home:get': { args: null; result: HomeStats };
   'settings:get': {
     args: null;
-    result: { settings: Settings; hotkeysFailed: string[]; version: string };
+    result: {
+      settings: Settings;
+      hotkeysFailed: string[];
+      version: string;
+      goals: import('./goals').Goals;
+    };
   };
   /** Экспорт/импорт данных (P1): системный диалог в main. reason — ключ ошибки. */
   'data:export': { args: null; result: { ok: boolean; path?: string; reason?: string } };
@@ -185,6 +197,7 @@ const COMMANDS: Record<keyof RendererCommands, true> = {
   'pet:feed': true,
   'micro:toggle': true,
   'evening:answer': true,
+  'goals:update': true,
   'app:open': true,
   'settings:update': true,
   'settings:resetProgress': true,

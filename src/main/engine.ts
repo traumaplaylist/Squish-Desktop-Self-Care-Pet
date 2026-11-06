@@ -30,7 +30,14 @@ import type {
   Snapshot,
   SuppressReason,
 } from '../core/types';
-import { dailyGoal, economyForDay, payCoins, payCreation, REWARDS } from '../core/economy';
+import {
+  dailyGoal,
+  economyForDay,
+  payBlinkPosture,
+  payCoins,
+  payCreation,
+  REWARDS,
+} from '../core/economy';
 import { FIRST_AID, pickLine } from '../core/lines';
 import {
   catchUpDays,
@@ -65,6 +72,7 @@ import { dayScore, lastDays, prevDayKey, statsByDay } from '../core/stats';
 import { selectVisual } from '../core/visual';
 import { addDiary, adventureDue, finishAdventure, startAdventure } from '../core/adventure';
 import { questionFor, shouldAskEvening } from '../core/evening';
+import { blinkPostureKinds, cleanGoals, shouldReviewGoals, type Goals } from '../core/goals';
 import { chance } from '../core/hash';
 import {
   addCompletion,
@@ -166,6 +174,9 @@ export class Engine {
   private visualOverride: PetVisualState | null = null;
   private lastIdleMs = 0;
   private fakeIdleMs: number | null = null;
+  /** «Моргни/выпрямись»: активное время с прошлого напоминания и чьё оно было. */
+  private bpActiveMs = 0;
+  private bpLast: 'blink' | 'posture' | null = null;
 
   constructor(private readonly d: EngineDeps) {
     this.sched = resumeScheduler(d.getState().scheduler, d.clock.now());
@@ -316,6 +327,8 @@ export class Engine {
     this.maybeCheckin(now, after);
     this.maybeEvening(now, after);
     this.maybeRemind(now, after);
+    this.maybeBlinkPosture(activeDelta, after);
+    this.maybeReviewGoals(now, after);
     this.maybeChatter(now, after);
     if (r.remind && !this.bubble) {
       this.setBubble(
@@ -462,6 +475,99 @@ export class Engine {
     this.bubble = null;
     this.setBubble({ textKey: 'evening.thanks' }, 4000);
     this.d.onEffects([{ type: 'petReaction', reaction: 'hug' }]);
+  }
+
+  /**
+   * «Моргни / выпрямись» (SPEC 2.4 blinkPosture, P1): раз в N минут активного времени, по очереди.
+   * Только в обычной работе, без облачка поверх другого; «ок» — +1 энергии (≤ 6 в день).
+   */
+  private maybeBlinkPosture(activeDelta: number, s: SchedulerState): void {
+    const bp = this.d.getSettings().blinkPosture;
+    if (!bp.enabled) return;
+    this.bpActiveMs += activeDelta;
+    if (this.bpActiveMs < bp.intervalMin * MINUTE) return;
+    if (this.bubble || s.phase !== 'working' || this.d.getState().pet.adventure) return;
+    const kinds = blinkPostureKinds(this.d.getState().goals);
+    const kind = kinds.length > 1 && this.bpLast === kinds[0] ? kinds[1]! : kinds[0]!;
+    this.bpLast = kind;
+    this.bpActiveMs = 0;
+    this.setBubble(
+      {
+        textKey: kind === 'blink' ? 'bp.blink' : 'bp.posture',
+        actions: [
+          { labelKey: 'bp.ok', action: 'bp:ok' },
+          { labelKey: 'bp.later', action: 'dismiss' },
+        ],
+      },
+      MINUTE,
+    );
+    this.d.onEffects([
+      { type: 'petReaction', reaction: kind === 'posture' ? 'straighten' : 'bounce' },
+    ]);
+  }
+
+  /** «Моргнул/выпрямился — ок». */
+  ackBlinkPosture(): void {
+    const now = this.d.clock.now();
+    const st = this.d.getState();
+    const r = payBlinkPosture(economyForDay(st.economy, dayKey(now)));
+    this.d.setState(
+      {
+        ...st,
+        economy: r.economy,
+        pet: { ...st.pet, energyToday: st.pet.energyToday + r.reward.energy },
+      },
+      0,
+    );
+    this.d.appendEvent({ type: this.bpLast === 'posture' ? 'posture_ack' : 'blink_ack', at: now });
+    this.bubble = null;
+    this.setBubble({ textKey: 'bp.thanks' }, 2500);
+  }
+
+  /** Через неделю после выбора целей — один раз мягко спросить, не поменять ли (без давления). */
+  private maybeReviewGoals(now: number, s: SchedulerState): void {
+    const st = this.d.getState();
+    if (this.bubble || s.phase !== 'working' || !shouldReviewGoals(st.goals, now)) return;
+    this.d.setState({ ...st, goals: { ...st.goals, reviewAsked: true } }, 0);
+    this.setBubble(
+      {
+        textKey: 'goals.review',
+        actions: [
+          { labelKey: 'goals.reviewOpen', action: 'goals:open' },
+          { labelKey: 'goals.reviewKeep', action: 'dismiss' },
+        ],
+      },
+      5 * MINUTE,
+    );
+  }
+
+  /** Сохранить цели (онбординг / «Мои цели»). Подстройку настроек делает main (adaptSettings). */
+  setGoals(raw: unknown): Goals {
+    const now = this.d.clock.now();
+    const goals = cleanGoals(raw, now);
+    const st = this.d.getState();
+    this.d.setState({ ...st, goals }, 0);
+    return goals;
+  }
+
+  /** Стартовый план: мелкие ежедневные дела (i18n-ключи → переведённые названия). Без монет за создание. */
+  addPlanTasks(keys: string[]): void {
+    const now = this.d.clock.now();
+    const today = dayKey(now);
+    const tr = this.d.t ?? ((k: string) => k);
+    let ts = this.d.getTasks();
+    for (const key of keys.filter((k) => typeof k === 'string' && /^plan\.[a-zA-Z]+$/.test(k))) {
+      const title = tr(key);
+      if (ts.tasks.some((t) => t.title === title && t.recurrence.kind !== 'none')) continue;
+      ts = createTask(
+        ts,
+        { title, size: 'S', recurrence: { kind: 'daily' } },
+        { id: this.d.newId(), instanceId: this.d.newId() },
+        now,
+        today,
+      ).state;
+    }
+    this.saveTasks(ts);
   }
 
   /** Напоминание по времени (SPEC 5.1, P1): облачко с задачей; на умной паузе — после неё. */
@@ -1351,7 +1457,10 @@ export class Engine {
         }
       }
       if (e.type === 'bubble') this.showBubble(e.textKey, e.params, e.ttlMs);
-      if (e.type === 'breakFinished' && e.completed) this.rewardFinishedBreak(e.kind);
+      if (e.type === 'breakFinished' && e.completed) {
+        this.rewardFinishedBreak(e.kind);
+        this.bpActiveMs = 0; // глаза и спина только что отдохнули
+      }
     }
     // Состояние пишем не чаще раза в 10 с (SPEC 6); команды пользователя — сразу.
     this.d.setState(

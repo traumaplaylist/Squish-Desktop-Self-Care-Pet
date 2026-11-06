@@ -1,10 +1,42 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  AREAS,
+  starterPlan,
+  suggestedJourneys,
+  type ActivityAnswer,
+  type Area,
+  type Goals,
+  type OverwhelmAnswer,
+  type SleepAnswer,
+} from '../../core/goals';
 import { SPECIES, type Palette, type SpeciesId, type Strictness } from '../../core/types';
 import { createPetRenderer } from '../pet/createPetRenderer';
 import type { PetRenderer } from '../pet/PetRenderer';
 import { useI18n } from '../shared/useI18n';
 
-const HINTS = ['hint.lunch', 'hint.outside', 'hint.airing'];
+const STEPS = 8;
+/** Черты на выбор при знакомстве (остальные раскроются в приключениях). */
+const PICK_TRAITS = ['likesStars', 'collectsPebbles', 'napsInSun'] as const;
+const AREA_ICON: Record<Area, string> = {
+  eyes: '👀',
+  back: '🪑',
+  water: '💧',
+  sleep: '🌙',
+  stress: '🌀',
+  focus: '🎯',
+  routine: '🌱',
+};
+const PLAN_ICON: Record<string, string> = {
+  'plan.water': '💧',
+  'plan.stretch': '🦒',
+  'plan.window': '🪟',
+  'plan.bedtime': '🌙',
+  'plan.breaths': '🍃',
+  'plan.oneStep': '🪜',
+  'plan.mainThing': '🎯',
+  'plan.morning': '🌻',
+  'plan.happy': '😊',
+};
 
 /** Онбординг (SPEC 2.5): 4 экрана, ничего личного не спрашиваем. */
 export function Onboarding() {
@@ -16,8 +48,31 @@ export function Onboarding() {
   const [species, setSpecies] = useState<SpeciesId>('blob');
   const [glasses, setGlasses] = useState(8);
   const [strictness, setStrictness] = useState<Strictness>('normal');
-  const [tasks, setTasks] = useState<string[]>(['', '', '']);
   const [autostart, setAutostart] = useState(true);
+  const [trait, setTrait] = useState<string | null>(null);
+  const [sleep, setSleep] = useState<SleepAnswer | null>(null);
+  const [activity, setActivity] = useState<ActivityAnswer | null>(null);
+  const [overwhelm, setOverwhelm] = useState<OverwhelmAnswer | null>(null);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [planOff, setPlanOff] = useState<string[]>([]);
+  const [journeys, setJourneys] = useState<string[]>([]);
+  const goals: Goals = {
+    areas,
+    sleep,
+    activity,
+    overwhelm,
+    setAt: null,
+    reviewAsked: false,
+  };
+  const plan = starterPlan(goals);
+  const offerJourneys = suggestedJourneys(goals);
+  const toggle = <T,>(list: T[], v: T) =>
+    list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
+  // Перегруз или стресс — строгость по умолчанию «мягко» (можно поменять на следующем экране).
+  const goStrictness = () => {
+    if (overwhelm === 'often' || areas.includes('stress')) setStrictness('soft');
+    setStep(6);
+  };
   const host = useRef<HTMLDivElement>(null);
   const pet = useRef<PetRenderer | null>(null);
 
@@ -38,21 +93,25 @@ export function Onboarding() {
   }, [hatched, species]);
   useEffect(() => pet.current?.setPalette(palette), [palette, hatched]);
 
-  const finish = () =>
+  const finish = (withPlan: boolean) =>
     window.squish.send('onboarding:finish', {
       name: name.trim() || t(species === 'blob' ? 'pet.defaultName' : `species.${species}.name`),
       species,
       palette,
       goalGlasses: glasses,
       strictness,
-      tasks: tasks.map((x) => x.trim()).filter(Boolean),
+      tasks: [],
       autostart,
+      ...(trait ? { trait } : {}),
+      goals: { areas, sleep, activity, overwhelm },
+      plan: withPlan ? plan.filter((k) => !planOff.includes(k)) : [],
+      journeys: withPlan ? journeys.filter((j) => offerJourneys.includes(j as never)) : [],
     });
 
   const dots = (
     <div className="dots">
-      {[0, 1, 2, 3].map((i) => (
-        <i key={i} className={i === step ? 'on' : ''} />
+      {Array.from({ length: STEPS }, (_, i) => (
+        <i key={i} className={i === step ? 'on' : i < step ? 'past' : ''} />
       ))}
     </div>
   );
@@ -130,6 +189,94 @@ export function Onboarding() {
       )}
       {step === 1 && (
         <section>
+          <div className="say">{t('onb.selfcare.q')}</div>
+          <div className="choices column">
+            {(['onb.selfcare.a1', 'onb.selfcare.a2'] as const).map((k, i) => (
+              <button key={k} className={`choice wide tone-${i}`} onClick={() => setStep(2)}>
+                <span>{t(k)}</span>
+              </button>
+            ))}
+          </div>
+          <Nav t={t} back={() => setStep(0)} />
+        </section>
+      )}
+      {step === 2 && (
+        <section>
+          <h1>{t('onb.trait.title')}</h1>
+          <p className="muted">{t('onb.trait.hint')}</p>
+          <div className="choices column">
+            {PICK_TRAITS.map((k) => (
+              <button
+                key={k}
+                className={`choice wide${trait === k ? ' on' : ''}`}
+                onClick={() => setTrait(k)}
+              >
+                <b>{t(`trait.${k}`)}</b>
+              </button>
+            ))}
+          </div>
+          <Nav t={t} back={() => setStep(1)} next={() => setStep(3)} />
+        </section>
+      )}
+      {step === 3 && (
+        <section>
+          <div className="kicker">{t('onb.life.kicker')}</div>
+          <h1>{t('onb.life.title')}</h1>
+          <p className="muted">{t('onb.life.hint')}</p>
+          <Ask
+            label={t('onb.life.sleep')}
+            value={sleep}
+            options={['ok', 'little', 'hardToWake'] as const}
+            t={t}
+            prefix="onb.sleep"
+            onChange={setSleep}
+          />
+          <Ask
+            label={t('onb.life.activity')}
+            value={activity}
+            options={['low', 'some', 'lots'] as const}
+            t={t}
+            prefix="onb.activity"
+            onChange={setActivity}
+          />
+          <Ask
+            label={t('onb.life.overwhelm')}
+            value={overwhelm}
+            options={['rare', 'sometimes', 'often'] as const}
+            t={t}
+            prefix="onb.overwhelm"
+            onChange={setOverwhelm}
+          />
+          <Nav t={t} back={() => setStep(2)} next={() => setStep(4)} />
+        </section>
+      )}
+      {step === 4 && (
+        <section>
+          <div className="kicker">{t('onb.areas.kicker')}</div>
+          <h1>{t('onb.areas.title')}</h1>
+          <div className="areas">
+            {AREAS.map((a) => (
+              <button
+                key={a}
+                className={`area${areas.includes(a) ? ' on' : ''}`}
+                aria-pressed={areas.includes(a)}
+                onClick={() => setAreas((l) => toggle(l, a))}
+              >
+                <span className="area-icon" aria-hidden>
+                  {AREA_ICON[a]}
+                </span>
+                <span>{t(`goal.${a}`)}</span>
+                <span className="plus" aria-hidden>
+                  {areas.includes(a) ? '✓' : '+'}
+                </span>
+              </button>
+            ))}
+          </div>
+          <Nav t={t} back={() => setStep(3)} next={() => setStep(5)} />
+        </section>
+      )}
+      {step === 5 && (
+        <section>
           <h1>{t('onboarding.water')}</h1>
           <p className="muted">{t('onboarding.waterHint')}</p>
           <div className="choices">
@@ -144,10 +291,10 @@ export function Onboarding() {
               </button>
             ))}
           </div>
-          <Nav t={t} back={() => setStep(0)} next={() => setStep(2)} />
+          <Nav t={t} back={() => setStep(4)} next={goStrictness} />
         </section>
       )}
-      {step === 2 && (
+      {step === 6 && (
         <section>
           <h1>{t('onboarding.strict')}</h1>
           <div className="choices column">
@@ -162,38 +309,42 @@ export function Onboarding() {
               </button>
             ))}
           </div>
-          <Nav t={t} back={() => setStep(1)} next={() => setStep(3)} />
+          <Nav t={t} back={() => setStep(5)} next={() => setStep(7)} />
         </section>
       )}
-      {step === 3 && (
+      {step === 7 && (
         <section>
-          <h1>{t('onboarding.tasks')}</h1>
-          <p className="muted">{t('onboarding.tasksHint')}</p>
-          {tasks.map((v, i) => (
-            <input
-              key={i}
-              type="text"
-              className="task-input"
-              maxLength={200}
-              value={v}
-              placeholder={t('tasks.placeholder')}
-              onChange={(e) => setTasks((l) => l.map((x, j) => (j === i ? e.target.value : x)))}
-            />
-          ))}
-          <div className="chips">
-            {HINTS.map((h) => (
-              <button
-                key={h}
-                className="chip"
-                onClick={() =>
-                  setTasks((l) => {
-                    const i = l.findIndex((x) => !x.trim());
-                    return i < 0 ? l : l.map((x, j) => (j === i ? t(h) : x));
-                  })
-                }
-              >
-                + {t(h)}
-              </button>
+          <div className="say">{t('onb.plan.say')}</div>
+          <div className="plan">
+            <div className="plan-title">
+              {t('onb.plan.title', {
+                name:
+                  name.trim() ||
+                  t(species === 'blob' ? 'pet.defaultName' : `species.${species}.name`),
+              })}
+            </div>
+            <div className="muted plan-hint">{t('onb.plan.hint')}</div>
+            {plan.map((k) => (
+              <label key={k} className="plan-item">
+                <input
+                  type="checkbox"
+                  checked={!planOff.includes(k)}
+                  onChange={() => setPlanOff((l) => toggle(l, k))}
+                />
+                <span aria-hidden>{PLAN_ICON[k] ?? '•'}</span>
+                <span>{t(k)}</span>
+              </label>
+            ))}
+            {offerJourneys.map((j) => (
+              <label key={j} className="plan-item journey-offer">
+                <input
+                  type="checkbox"
+                  checked={journeys.includes(j)}
+                  onChange={() => setJourneys((l) => toggle(l, j))}
+                />
+                <span aria-hidden>🧭</span>
+                <span>{t('onb.plan.journey', { name: t(`journey.${j}`) })}</span>
+              </label>
             ))}
           </div>
           <label className="autostart">
@@ -205,15 +356,15 @@ export function Onboarding() {
             {t('onboarding.autostart')}
           </label>
           <div className="nav">
-            <button className="btn" onClick={() => setStep(2)}>
+            <button className="btn" onClick={() => setStep(6)}>
               {t('onboarding.back')}
             </button>
             <span>
-              <button className="btn" onClick={() => (setTasks(['', '', '']), finish())}>
+              <button className="btn" onClick={() => finish(false)}>
                 {t('onboarding.skip')}
               </button>{' '}
-              <button className="btn primary" onClick={finish}>
-                {t('onboarding.done')}
+              <button className="btn primary" onClick={() => finish(true)}>
+                {t('onb.plan.go')}
               </button>
             </span>
           </div>
@@ -244,6 +395,41 @@ function Nav({
       <button className="btn primary" disabled={!next} onClick={next}>
         {t('onboarding.next')}
       </button>
+    </div>
+  );
+}
+
+/** Вопрос «как жизнь» с вариантами-чипами. Можно не отвечать; повторный клик снимает выбор. */
+function Ask<T extends string>({
+  label,
+  value,
+  options,
+  t,
+  prefix,
+  onChange,
+}: {
+  label: string;
+  value: T | null;
+  options: readonly T[];
+  t: ReturnType<typeof useI18n>;
+  prefix: string;
+  onChange: (v: T | null) => void;
+}) {
+  return (
+    <div className="ask">
+      <div className="ask-label">{label}</div>
+      <div className="chips">
+        {options.map((o) => (
+          <button
+            key={o}
+            className={`chip${value === o ? ' on' : ''}`}
+            aria-pressed={value === o}
+            onClick={() => onChange(value === o ? null : o)}
+          >
+            {t(`${prefix}.${o}`)}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

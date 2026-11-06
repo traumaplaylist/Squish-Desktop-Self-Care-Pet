@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { AREAS, NO_GOALS, type Area, type Goals } from '../../core/goals';
 import type { SettingsPatch } from '../../core/settingsSchema';
 import type { Settings, Weekday } from '../../core/types';
 import { useI18n } from '../shared/useI18n';
@@ -16,12 +17,15 @@ export function SettingsPage() {
   const [newExe, setNewExe] = useState('');
   const [dataMsg, setDataMsg] = useState('');
   const [importStep, setImportStep] = useState(0);
+  const [goals, setGoals] = useState<Goals>(NO_GOALS);
+  const [goalsMsg, setGoalsMsg] = useState('');
 
   useEffect(() => {
     void window.squish.invoke('settings:get').then((r) => {
       setS(r.settings);
       setFailed(r.hotkeysFailed);
       setVersion(r.version);
+      setGoals(r.goals);
     });
     const offs = [
       window.squish.on('settings', setS),
@@ -37,6 +41,66 @@ export function SettingsPage() {
   return (
     <div className="page">
       <h1>{t('settings.title')}</h1>
+
+      <h2>{t('settings.goals')}</h2>
+      <div className="card goals">
+        <div className="hint">{t('settings.goalsHint')}</div>
+        <div className="chips">
+          {AREAS.map((a: Area) => {
+            const on = goals.areas.includes(a);
+            return (
+              <button
+                key={a}
+                className={`chip${on ? ' on' : ''}`}
+                aria-pressed={on}
+                style={on ? { background: 'var(--accent)' } : undefined}
+                onClick={() => {
+                  setGoalsMsg('');
+                  setGoals((g) => ({
+                    ...g,
+                    areas: on ? g.areas.filter((x) => x !== a) : [...g.areas, a],
+                  }));
+                }}
+              >
+                {t(`goal.${a}`)}
+              </button>
+            );
+          })}
+        </div>
+        {(
+          [
+            ['sleep', ['ok', 'little', 'hardToWake'], 'onb.sleep'],
+            ['activity', ['low', 'some', 'lots'], 'onb.activity'],
+            ['overwhelm', ['rare', 'sometimes', 'often'], 'onb.overwhelm'],
+          ] as const
+        ).map(([key, opts, prefix]) => (
+          <Field key={key} label={t(`onb.life.${key}`)}>
+            <Seg
+              value={(goals[key] ?? '') as string}
+              options={[
+                ['', '—'] as [string, string],
+                ...opts.map((o) => [o, t(`${prefix}.${o}`)] as [string, string]),
+              ]}
+              onChange={(v) => {
+                setGoalsMsg('');
+                setGoals((g) => ({ ...g, [key]: v || null }));
+              }}
+            />
+          </Field>
+        ))}
+        <div className="row-end">
+          {goalsMsg && <span className="hint">{goalsMsg} </span>}
+          <button
+            className="btn primary"
+            onClick={() => {
+              window.squish.send('goals:update', goals);
+              setGoalsMsg(t('settings.goalsSaved'));
+            }}
+          >
+            {t('settings.goalsSave')}
+          </button>
+        </div>
+      </div>
 
       <h2>{t('settings.breaks')}</h2>
       <div className="card">
@@ -307,6 +371,12 @@ export function SettingsPage() {
 
       <h2>{t('settings.pet')}</h2>
       <div className="card">
+        <Toggle
+          label={t('settings.blinkPosture')}
+          hint={t('settings.blinkPostureHint', { n: s.blinkPosture.intervalMin })}
+          value={s.blinkPosture.enabled}
+          onChange={(v) => set({ blinkPosture: { enabled: v } })}
+        />
         <Field label={t('settings.chatter')}>
           <Seg
             value={s.pet.chatter}

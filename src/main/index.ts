@@ -29,6 +29,8 @@ import {
   type Snapshot,
 } from '../core/types';
 import { Engine } from './engine';
+import { adaptSettings } from '../core/goals';
+import { TRAITS } from '../core/traits';
 import { getDict, setLang, t } from './i18n';
 import { validateSettings } from '../core/settingsSchema';
 import { closePage, openPage, retitlePages } from './windows/pages';
@@ -585,7 +587,13 @@ async function main(): Promise<void> {
     settings: settingsStore.get(),
     hotkeysFailed: engine.snapshot().hotkeysFailed,
     version: VERSION,
+    goals: stateStore.get().goals,
   }));
+  on('goals:update', (raw) => {
+    const goals = engine.setGoals(raw);
+    updateSettings(adaptSettings(goals, settingsStore.get()));
+    publish();
+  });
   on('app:open', (w) => {
     if (w === 'home' || w === 'settings') openPage(w);
     else if (w === 'tasks') tasksWin.show('panel');
@@ -666,11 +674,22 @@ async function main(): Promise<void> {
       },
       0,
     );
+    // Цели → подстройка настроек; явный выбор человека (вода, строгость) — поверх подстройки.
+    const goals = engine.setGoals(r.goals ?? {});
+    updateSettings(adaptSettings(goals, settingsStore.get()));
     updateSettings({
       water: { goalGlasses: r.goalGlasses },
       breaks: { strictness: r.strictness },
       general: { autostart: r.autostart === true },
     });
+    if (typeof r.trait === 'string' && (TRAITS as readonly string[]).includes(r.trait)) {
+      const s2 = stateStore.get();
+      stateStore.set({ ...s2, pet: { ...s2.pet, revealedTraits: [r.trait] } }, 0);
+    }
+    if (Array.isArray(r.plan)) engine.addPlanTasks(r.plan.slice(0, 10));
+    for (const j of Array.isArray(r.journeys) ? r.journeys.slice(0, 3) : []) {
+      if (typeof j === 'string') engine.startJourney(j);
+    }
     for (const text of Array.isArray(r.tasks) ? r.tasks.slice(0, 3) : []) {
       if (typeof text === 'string') engine.createTaskFromText(text);
     }
@@ -705,7 +724,11 @@ async function main(): Promise<void> {
     else if (a === 'quiet:ignoreApp') ignoreQuietApp();
     else if (a === 'dismiss') engine.dismissBubble();
     else if (a === 'hardDay:on') engine.setHardDay(true);
-    else if (a === 'evening:answer' || a === 'adventure:diary') {
+    else if (a === 'bp:ok') engine.ackBlinkPosture();
+    else if (a === 'goals:open') {
+      engine.dismissBubble();
+      openPage('settings');
+    } else if (a === 'evening:answer' || a === 'adventure:diary') {
       engine.dismissBubble();
       openHomeTab('diary');
     } else if (a.startsWith('task:done:')) {

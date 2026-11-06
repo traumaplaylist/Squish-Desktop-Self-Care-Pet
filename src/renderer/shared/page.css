@@ -144,3 +144,10 @@ select:focus {
   color: var(--text);
   cursor: pointer;
 }
+.row-end {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}

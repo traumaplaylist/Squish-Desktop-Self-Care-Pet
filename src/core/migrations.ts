@@ -5,7 +5,7 @@
 import { defaultState } from './defaults';
 import type { PersistedState } from './types';
 
-export const STATE_VERSION = 7;
+export const STATE_VERSION = 8;
 
 export function stateMigrations(now: () => number): Record<number, (d: unknown) => unknown> {
   const def = () => defaultState(now());
@@ -49,6 +49,8 @@ export function stateMigrations(now: () => number): Record<number, (d: unknown) 
         },
       };
     },
+    // v7 → v8: «Мои цели» (у прошедших старый онбординг — пусто, можно задать в настройках).
+    7: (d) => ({ ...(d as PersistedState), goals: def().goals }),
   };
 }
 

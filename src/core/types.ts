@@ -300,6 +300,8 @@ export type BubbleAction =
   | 'checkin:5'
   | 'hardDay:on'
   | 'evening:answer'
+  | 'bp:ok'
+  | 'goals:open'
   | 'adventure:diary'
   | `task:done:${string}`;
 
@@ -322,6 +324,8 @@ export interface PersistedState {
   widget: { position: WidgetPosition | null; visible: boolean };
   onboardingDone: boolean;
   lastDayClosed: DayKey | null;
+  /** «Мои цели» (онбординг по мотивам Finch): с чем помочь; меняется в настройках. */
+  goals: import('./goals').Goals;
 }
 
 /** Содержимое tasks.json. */

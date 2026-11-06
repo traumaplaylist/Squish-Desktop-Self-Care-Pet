@@ -6,7 +6,7 @@ import type { AppEvent, Effect } from '../core/events';
 import type { PersistedState } from '../core/types';
 import { Engine, STILL_ON_CALL_MS } from './engine';
 
-function setup(debug = false) {
+function setup(debug = false, settings = DEFAULT_SETTINGS) {
   const clock = new FakeClock(new Date(2026, 10, 5, 12).getTime());
   let real = 0;
   let idleMs = 0;
@@ -26,7 +26,7 @@ function setup(debug = false) {
       state = s;
       saves.push(delay);
     },
-    getSettings: () => DEFAULT_SETTINGS,
+    getSettings: () => settings,
     getTasks: () => tasks,
     setTasks: (t) => {
       tasks = t;
@@ -468,5 +468,73 @@ describe('Engine — Неделя 2', () => {
     t.engine.dismissBubble();
     t.step(5 * SECOND);
     expect(t.engine.snapshot().bubble?.textKey).not.toBe('task.reminder'); // второй раз не зовёт
+  });
+});
+
+describe('Engine — цели и «моргни/выпрямись»', () => {
+  it('напоминание раз в 30 мин активного времени, «Сделал» → +1 энергии; выключено — молчит', () => {
+    const t = setup();
+    t.engine.random = () => 0.5;
+    t.step(SECOND);
+    t.engine.dismissBubble();
+    t.engine.answerCheckin(4);
+    t.engine.dismissBubble();
+    // по умолчанию выключено
+    let seen = false;
+    for (let i = 0; i < 40; i++) {
+      t.step(MINUTE);
+      if (t.engine.getSchedulerState().phase === 'preBreak') t.engine.dispatch({ type: 'skip' });
+      if ((t.engine.snapshot().bubble?.textKey ?? '').startsWith('bp.')) seen = true;
+    }
+    expect(seen).toBe(false);
+  });
+  it('включено целью «глаза»: «Моргни», «Сделал» — +1 энергии', () => {
+    const t = setup(false, {
+      ...DEFAULT_SETTINGS,
+      breaks: {
+        ...DEFAULT_SETTINGS.breaks,
+        micro: { ...DEFAULT_SETTINGS.breaks.micro, enabled: false },
+        long: { ...DEFAULT_SETTINGS.breaks.long, enabled: false },
+      },
+      blinkPosture: { enabled: true, intervalMin: 30 },
+    });
+    t.engine.random = () => 0.5;
+    t.step(SECOND);
+    t.engine.dismissBubble();
+    t.engine.answerCheckin(4);
+    t.engine.dismissBubble();
+    t.engine.setGoals({ areas: ['eyes'] });
+    let key = '';
+    for (let i = 0; i < 35 && !key.startsWith('bp.'); i++) {
+      t.step(MINUTE);
+      key = t.engine.snapshot().bubble?.textKey ?? '';
+    }
+    expect(key).toBe('bp.blink');
+    const e0 = t.state().pet.energyToday;
+    t.engine.ackBlinkPosture();
+    expect(t.state().pet.energyToday).toBe(e0 + 1);
+    expect(t.events.some((e) => e.type === 'blink_ack')).toBe(true);
+  });
+  it('стартовый план → ежедневные задачи с переведёнными названиями, без дублей', () => {
+    const t = setup();
+    t.engine.addPlanTasks(['plan.water', 'plan.happy', 'evil', 'plan.water']);
+    const open = t.engine.tasksView().open;
+    expect(open.map((x) => x.title)).toEqual(['plan.water', 'plan.happy']);
+    expect(open.every((x) => x.recurring)).toBe(true);
+    t.engine.addPlanTasks(['plan.water']);
+    expect(t.engine.tasksView().open).toHaveLength(2);
+  });
+  it('цели сохраняются; через неделю — один вопрос', () => {
+    const t = setup();
+    t.engine.setGoals({ areas: ['eyes'] });
+    expect(t.state().goals.areas).toEqual(['eyes']);
+    t.clock.advance(7 * 24 * 60 * MINUTE + MINUTE);
+    t.step(SECOND);
+    t.engine.dismissBubble(); // чек-ин нового дня
+    t.engine.answerCheckin(4);
+    t.engine.dismissBubble();
+    t.step(2 * SECOND);
+    expect(t.engine.snapshot().bubble?.textKey).toBe('goals.review');
+    expect(t.state().goals.reviewAsked).toBe(true);
   });
 });

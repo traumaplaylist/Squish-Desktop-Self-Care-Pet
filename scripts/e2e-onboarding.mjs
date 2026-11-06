@@ -47,17 +47,37 @@ try {
   await onb.getByRole('button', { name: 'персиковый' }).click();
   await wait(200);
   await onb.screenshot({ path: join(out, 'e2e-onb-name.png') });
-  await onb.getByRole('button', { name: 'Дальше' }).click();
+  const next = () => onb.getByRole('button', { name: 'Дальше' }).click();
+  await next();
+  // «Что такое забота о себе?» — любой ответ ведёт дальше
+  await onb.locator('.choice.tone-1').click();
+  await onb.locator('.choice', { hasText: 'Любит звёзды' }).click();
+  await next();
+  // «Как жизнь»: можно не отвечать — отвечаем на всё
+  await onb.locator('.chip', { hasText: 'Сплю мало' }).click();
+  await onb.locator('.chip', { hasText: 'Почти всё время сижу' }).click();
+  await onb.locator('.chip', { hasText: 'Часто' }).click();
+  await onb.screenshot({ path: join(out, 'e2e-onb-life.png') });
+  await next();
+  await onb.locator('.area', { hasText: 'Глаза устают' }).click();
+  await onb.screenshot({ path: join(out, 'e2e-onb-areas.png') });
+  await next();
   await onb.locator('.choice', { hasText: '10' }).click();
-  await onb.getByRole('button', { name: 'Дальше' }).click();
-  await onb.locator('.choice', { hasText: 'Мягко' }).click();
-  await onb.getByRole('button', { name: 'Дальше' }).click();
-  await onb.locator('.chip', { hasText: 'выйти на улицу' }).click();
-  await onb.locator('.task-input').nth(1).fill('позвонить маме');
+  await next();
+  check(
+    (await onb.locator('.choice.on', { hasText: 'Мягко' }).count()) === 1,
+    'перегруз «часто» → строгость «мягко» выбрана заранее',
+  );
+  await next();
+  // Стартовый план: 7 дел под ответы, снимаем одно, берём Путь «Режим сна»
+  const items = onb.locator('.plan-item:not(.journey-offer)');
+  check((await items.count()) === 7, `стартовый план: 7 дел (сейчас ${await items.count()})`);
+  await items.filter({ hasText: 'Разбить одно большое дело' }).locator('input').uncheck();
+  await onb.locator('.journey-offer', { hasText: 'Режим сна' }).locator('input').check();
   await onb.screenshot({ path: join(out, 'e2e-onb-tasks.png') });
-  await onb.getByRole('button', { name: 'Готово' }).click();
+  await onb.getByRole('button', { name: 'Давай!' }).click();
   await wait(1200);
-  check(await visible('Squish — питомец'), 'после «Готово» — питомец в углу');
+  check(await visible('Squish — питомец'), 'после «Давай!» — питомец в углу');
   const widget = await find(async (w) => (await w.locator('.pet-host').count()) > 0, 'widget');
   let snap = await widget.evaluate(() => window.squish.invoke('app:getSnapshot'));
   check(
@@ -68,9 +88,18 @@ try {
     snap.water.goal === 10 && snap.scheduler.strictness === 'soft',
     'вода 10 стаканов, строгость мягкая',
   );
-  check(snap.tasksToday.total === 2, `2 дела из онбординга (сейчас ${snap.tasksToday.total})`);
+  check(snap.tasksToday.total === 8, `6 дел плана + 2 дела Пути (сейчас ${snap.tasksToday.total})`);
+  const sett = await widget.evaluate(() => window.squish.invoke('settings:get'));
+  check(
+    sett.settings.breaks.micro.intervalMin === 15 &&
+      sett.settings.breaks.long.intervalMin === 45 &&
+      sett.settings.blinkPosture.enabled === true,
+    'цели подстроили перерывы (глаза 15 мин, разминка 45) и включили «моргни/выпрямись»',
+  );
+  check(sett.goals.areas.join() === 'eyes' && sett.goals.sleep === 'little', 'цели сохранены');
   const state = JSON.parse(readFileSync(join(userData, 'state.json'), 'utf8'));
   check(state.data.onboardingDone === true, 'онбординг отмечен пройденным');
+  check(state.data.pet.revealedTraits.join() === 'likesStars', 'выбранная черта раскрыта');
 
   // Настройки: применяются сразу, язык — на лету
   await app.evaluate(() => globalThis.__squishOpen?.('settings'));

@@ -1,3 +1,4 @@
+import { NO_GOALS } from './goals';
 import type { PersistedState, PersistedTasks, Settings } from './types';
 import { defaultWater } from './water';
 
@@ -25,7 +26,8 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   water: { goalGlasses: 8, glassMl: 250, remindAfterMin: 90 },
   tasks: { defaultSize: 'S', showSelfCareHints: true },
-  blinkPosture: { enabled: true, intervalMin: 30 },
+  // «моргни/выпрямись» включаются целями («глаза», «спина») или в настройках — по умолчанию не дёргаем
+  blinkPosture: { enabled: false, intervalMin: 30 },
   pet: { chatter: 'often', sounds: true, volume: 0.4, showMicroPets: true },
   general: { autostart: true, clickThrough: false, hideFromCapture: true, minimalWidget: false },
   hotkeys: {
@@ -94,6 +96,7 @@ export function defaultState(now: number): PersistedState {
     widget: { position: null, visible: true },
     onboardingDone: false,
     lastDayClosed: null,
+    goals: { ...NO_GOALS, areas: [] },
   };
 }
 
