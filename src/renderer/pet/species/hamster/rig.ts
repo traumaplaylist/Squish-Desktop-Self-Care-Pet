@@ -28,10 +28,12 @@ export const HAMSTER: SpeciesRig = {
   anchors: { glass: { x: 250, y: 210 }, sweat: { x: 210, y: 40 }, neck: { x: 130, y: 132 } },
   outfits: {
     wizard: {
-      back: [{ src: 'cape-back', x: -5, y: 128, w: 271 }],
-      front: [{ src: 'cape-front', x: 4, y: 126, w: 253 }],
-      top: [{ src: 'hat', x: 34, y: -122, w: 195 }],
-      prop: { src: 'wand', x: 222, y: 96, w: 34 },
+      // Сверено с эталоном ChatGPT: конус шляпы за головой (уши торчат перед ним),
+      // поля поверх лба; плащ от плеч почти до лапок, живот виден в разрезе.
+      back: [{ src: 'hat-cone', x: 38, y: -90, w: 184, h: 116 }],
+      front: [{ src: 'cape-front', x: -40, y: 136, w: 341, h: 140 }],
+      top: [{ src: 'hat-brim', x: -14, y: 14, w: 273, h: 38 }],
+      prop: { src: 'wand', x: 234, y: 112, w: 34 },
     },
   },
 };

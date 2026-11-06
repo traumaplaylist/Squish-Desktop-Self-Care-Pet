@@ -38,11 +38,18 @@ try {
   await dbg.getByRole('button', { name: '×1', exact: true }).click();
   await dbg.getByRole('button', { name: 'печатаю' }).click();
   await wait(2500);
-  await widget.locator('.bubble').getByRole('button', { name: '🙂' }).click().catch(() => {});
+  await widget
+    .locator('.bubble')
+    .getByRole('button', { name: '🙂' })
+    .click()
+    .catch(() => {});
   await dbg.getByRole('button', { name: 'Хомяк-булочка' }).click();
   await widget.locator('.pet.layered.species-hamster').waitFor({ timeout: 5000 });
   check(true, 'Debug → «Хомяк-булочка»: виджет перерисован зверем из деталей');
-  check((await widget.locator('.pet.layered image').count()) >= 8, 'детали на месте (тело, лапки, ноги, глаза, рот, румянец…)');
+  check(
+    (await widget.locator('.pet.layered image').count()) >= 8,
+    'детали на месте (тело, лапки, ноги, глаза, рот, румянец…)',
+  );
   await wait(1200);
   await widget.screenshot({ path: join(out, '01-idle.png') });
 
@@ -50,7 +57,10 @@ try {
   for (const st of states) {
     await dbg.getByRole('button', { name: st, exact: true }).click();
     await wait(900);
-    check((await widget.locator(`.pet.layered[data-state="${st}"]`).count()) === 1, `состояние ${st}`);
+    check(
+      (await widget.locator(`.pet.layered[data-state="${st}"]`).count()) === 1,
+      `состояние ${st}`,
+    );
     await widget.screenshot({ path: join(out, `02-${st.replace(':', '-')}.png`) });
     await dbg.getByRole('button', { name: st, exact: true }).click(); // снять переопределение
   }
@@ -69,15 +79,24 @@ try {
   for (const r of ['bounce', 'drink', 'hug', 'celebrate']) {
     await dbg.getByRole('button', { name: r, exact: true }).click();
     await wait(r === 'drink' ? 500 : 300);
-    check((await widget.locator(`.pet.layered .hop[data-reaction="${r}"]`).count()) === 1, `реакция ${r}`);
+    check(
+      (await widget.locator(`.pet.layered .hop[data-reaction="${r}"]`).count()) === 1,
+      `реакция ${r}`,
+    );
     await widget.screenshot({ path: join(out, `03-${r}.png`) });
     await wait(1200);
   }
 
   await dbg.getByRole('button', { name: 'Волшебник' }).click();
   await wait(800);
-  check((await widget.locator('.pet.layered image[href*="hat"]').count()) === 1, 'наряд «Волшебник»: шляпа');
-  check((await widget.locator('.pet.layered image[href*="wand"]').count()) === 1, 'палочка в лапке');
+  check(
+    (await widget.locator('.pet.layered image[href*="hat-"]').count()) === 2,
+    'наряд «Волшебник»: шляпа (конус + поля)',
+  );
+  check(
+    (await widget.locator('.pet.layered image[href*="wand"]').count()) === 1,
+    'палочка в лапке',
+  );
   await widget.screenshot({ path: join(out, '04-wizard.png') });
   await dbg.getByRole('button', { name: 'стадия +1' }).click();
   await dbg.getByRole('button', { name: 'стадия +1' }).click();
@@ -86,7 +105,11 @@ try {
 
   // Оверлей перерыва с хомяком
   await dbg.getByRole('button', { name: 'Длинный сейчас' }).click();
-  const ov = await find(async (w) => (await w.locator('.overlay .steps').count()) > 0, 'overlay', 10_000);
+  const ov = await find(
+    async (w) => (await w.locator('.overlay .steps').count()) > 0,
+    'overlay',
+    10_000,
+  );
   await ov.locator('.big-pet .pet.layered').waitFor({ timeout: 5000 });
   check(true, 'на оверлее — тоже хомяк');
   await wait(1500);
@@ -95,7 +118,10 @@ try {
   // Назад к блобу
   await dbg.getByRole('button', { name: 'Сквиш', exact: true }).click();
   await wait(800);
-  check((await widget.locator('.pet:not(.layered)').count()) === 1, 'обратно на Сквиша — без перезапуска');
+  check(
+    (await widget.locator('.pet:not(.layered)').count()) === 1,
+    'обратно на Сквиша — без перезапуска',
+  );
 } catch (e) {
   check(false, e instanceof Error ? e.message : String(e));
 } finally {

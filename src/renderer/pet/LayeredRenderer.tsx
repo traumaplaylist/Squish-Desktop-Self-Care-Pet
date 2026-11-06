@@ -54,7 +54,7 @@ function Part({
   const size = assets.sizes[key];
   const url = assets.urls[key];
   if (!size || !url) return null;
-  const h = (part.w * size[1]) / size[0];
+  const h = part.h ?? (part.w * size[1]) / size[0];
   return (
     <image
       href={url}
@@ -62,6 +62,7 @@ function Part({
       y={part.y}
       width={part.w}
       height={h}
+      preserveAspectRatio={part.h ? 'none' : undefined}
       className={className}
       style={style}
       {...(hit ? { 'data-hit': true } : {})}
