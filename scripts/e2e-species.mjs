@@ -44,11 +44,11 @@ try {
     .click()
     .catch(() => {});
   await dbg.getByRole('button', { name: 'Хомяк-булочка' }).click();
-  await widget.locator('.pet.layered.species-hamster').waitFor({ timeout: 5000 });
-  check(true, 'Debug → «Хомяк-булочка»: виджет перерисован зверем из деталей');
+  await widget.locator('.pet.species-hamster.species-hamster').waitFor({ timeout: 5000 });
+  check(true, 'Debug → «Хомяк-булочка»: виджет перерисован хомяком');
   check(
-    (await widget.locator('.pet.layered image').count()) >= 8,
-    'детали на месте (тело, лапки, ноги, глаза, рот, румянец…)',
+    (await widget.locator('.pet.species-hamster .arm').count()) === 2,
+    'лапки на месте',
   );
   await wait(1200);
   await widget.screenshot({ path: join(out, '01-idle.png') });
@@ -58,7 +58,7 @@ try {
     await dbg.getByRole('button', { name: st, exact: true }).click();
     await wait(900);
     check(
-      (await widget.locator(`.pet.layered[data-state="${st}"]`).count()) === 1,
+      (await widget.locator(`.pet.species-hamster[data-state="${st}"]`).count()) === 1,
       `состояние ${st}`,
     );
     await widget.screenshot({ path: join(out, `02-${st.replace(':', '-')}.png`) });
@@ -70,7 +70,7 @@ try {
   // Моргание: в течение ~8 с хотя бы раз будет .blink
   let blinked = false;
   for (let i = 0; i < 80 && !blinked; i++) {
-    blinked = (await widget.locator('.pet.layered.blink').count()) > 0;
+    blinked = (await widget.locator('.pet.species-hamster.blink').count()) > 0;
     await wait(100);
   }
   check(blinked, 'моргает сам (раз в 3–7 с)');
@@ -80,7 +80,7 @@ try {
     await dbg.getByRole('button', { name: r, exact: true }).click();
     await wait(r === 'drink' ? 500 : 300);
     check(
-      (await widget.locator(`.pet.layered .hop[data-reaction="${r}"]`).count()) === 1,
+      (await widget.locator(`.pet.species-hamster .hop[data-reaction="${r}"]`).count()) === 1,
       `реакция ${r}`,
     );
     await widget.screenshot({ path: join(out, `03-${r}.png`) });
@@ -90,11 +90,12 @@ try {
   await dbg.getByRole('button', { name: 'Волшебник' }).click();
   await wait(800);
   check(
-    (await widget.locator('.pet.layered image[href*="hat-"]').count()) === 2,
-    'наряд «Волшебник»: шляпа (конус + поля)',
+    (await widget.locator('.pet.outfit-wizard .wizard-cone').count()) === 1 &&
+      (await widget.locator('.pet.outfit-wizard .wizard-brim').count()) === 1,
+    'наряд «Волшебник»: колпак (конус + поля)',
   );
   check(
-    (await widget.locator('.pet.layered image[href*="wand"]').count()) === 1,
+    (await widget.locator('.pet.outfit-wizard .arm-r .wizard-wand').count()) === 1,
     'палочка в лапке',
   );
   await widget.screenshot({ path: join(out, '04-wizard.png') });
@@ -110,7 +111,7 @@ try {
     'overlay',
     10_000,
   );
-  await ov.locator('.big-pet .pet.layered').waitFor({ timeout: 5000 });
+  await ov.locator('.big-pet .pet.species-hamster').waitFor({ timeout: 5000 });
   check(true, 'на оверлее — тоже хомяк');
   await wait(1500);
   await ov.screenshot({ path: join(out, '06-overlay.png') });
@@ -119,7 +120,7 @@ try {
   await dbg.getByRole('button', { name: 'Сквиш', exact: true }).click();
   await wait(800);
   check(
-    (await widget.locator('.pet:not(.layered)').count()) === 1,
+    (await widget.locator('.pet:not(.species-hamster)').count()) === 1,
     'обратно на Сквиша — без перезапуска',
   );
 } catch (e) {

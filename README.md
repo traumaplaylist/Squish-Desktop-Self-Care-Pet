@@ -106,12 +106,11 @@ src/
 6. **Подключи** его в `createPetRenderer.ts`: `case 'spriteSheet': return new SpriteSheetRenderer(container);`. Затем замени `'svgBlob'` на `'spriteSheet'` в местах вызова: виджет, оверлей, онбординг, «Дом».
 7. **Проверь:** `npm run dev:debug`, в окне Debug прощёлкай все состояния и реакции, затем запусти `node scripts/measure-idle.mjs`. Анимация на 12 fps в покое должна укладываться в бюджет CPU.
 
-## Как добавить зверя из деталей (PNG)
+## Как добавить нового зверя (вектор)
 
-Питомец может собираться из отдельных PNG-деталей (`LayeredRenderer`). Пример — `src/renderer/pet/species/hamster/`.
+Звери рисуются в SVG в той же системе координат, что и блоб (кадр 200×200, лапки ~ x 44/156, y 146, глаза ~ y 106). Тогда все анимации из `blob.css` работают без изменений. Пример — `src/renderer/pet/species/hamster/HamsterSvg.tsx`.
 
-1. Положи детали в `src/renderer/pet/species/<id>/`: `body`, `arm-l`, `arm-r`, `feet`, `shadow`, `blush`, глаза `eyes-open/closed/happy/sleepy`, рты `mouth-smile/open/o/flat`. Фон должен быть прозрачным. Наряд — `hat`, `cape-front`, `cape-back`, `wand` и т.п.
-2. `sizes.json` — размеры каждой PNG `{ "body": [261, 288], … }`. Тест `rig.test.ts` проверит, что он совпадает с файлами.
-3. `rig.ts` — где лежит каждая деталь в координатах тела, плечи (точки вращения лапок), якоря стакана, капли пота и шарфа, слои нарядов.
-4. Добавь id в `SpeciesId`/`SPECIES` (`core/types.ts`), рига в `RIGS` (`species/index.ts`) и ключи `species.<id>`, `species.<id>.name` в i18n.
-5. Проверь: `SQUISH_SPECIES=<id> npm run dev:debug` и `node scripts/e2e-species.mjs`.
+1. Скопируй `HamsterSvg.tsx` в `species/<id>/` и перерисуй тело, уши, лицо. Классы `.arm-l/.arm-r`, `.eye`, `.pupil`, `.glass`, `.sweat`, `.lid` оставь — на них завязаны анимации.
+2. Наряды — объекты `{ back, front, prop, top }` в `<ID>_OUTFITS`: что за головой, поверх тела, в правой лапке и поверх всего.
+3. Добавь id в `SpeciesId`/`SPECIES` (`core/types.ts`), ветку в `createPetRenderer.ts` и ключи `species.<id>`, `species.<id>.name` в i18n.
+4. Проверь: `SQUISH_SPECIES=<id> npm run dev:debug` и `node scripts/e2e-species.mjs`.

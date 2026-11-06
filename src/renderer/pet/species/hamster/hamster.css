@@ -1,0 +1,30 @@
+/* Хомяк (вектор). Анимации — общие из blob.css; здесь только цвета линий лица. */
+.pet.species-hamster .eyes.closed path {
+  stroke: #4a2a1b;
+  stroke-width: 3;
+}
+.pet.species-hamster .h-mouth {
+  fill: none;
+  stroke: #6b3a24;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pet.species-hamster .h-mouth-open path {
+  fill: #6b3a24;
+  stroke: #6b3a24;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.pet.species-hamster .h-mouth-o {
+  fill: #6b3a24;
+  opacity: 0.8;
+}
+.pet.species-hamster .eye {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+/* В упражнениях лапки поднимаются над головой — палочку убираем, чтобы не протыкала колпак. */
+.pet.species-hamster.state-onBreak-stretchUp .wizard-wand {
+  display: none;
+}

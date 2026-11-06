@@ -17,9 +17,6 @@
     "electron.vite.config.ts",
     "vitest.config.mts",
     "src/renderer/**/*.test.ts",
-    "src/renderer/pet/rig.ts",
-    "src/renderer/pet/breath.ts",
-    "src/renderer/pet/species/*/rig.ts",
-    "src/renderer/pet/species/*/sizes.json"
+    "src/renderer/pet/breath.ts"
   ]
 }
