@@ -14,10 +14,8 @@ body,
   align-items: center;
   justify-content: center;
   color: #f6f2fb;
-  background:
-    radial-gradient(ellipse at 30% 20%, rgba(120, 200, 180, 0.22), transparent 60%),
-    radial-gradient(ellipse at 75% 80%, rgba(170, 140, 230, 0.2), transparent 60%),
-    rgba(24, 20, 36, var(--dim));
+  background: rgba(24, 20, 36, var(--dim));
+  overflow: hidden;
   opacity: 0;
   transition: opacity 600ms ease-out;
 }
@@ -119,4 +117,40 @@ body,
 }
 .stage.small {
   opacity: 0.85;
+}
+
+/* Фон (SPEC 2.2, P1): спокойный градиент, медленно плывёт. Анимируется transform слоя —
+   это делает композитор, без перерисовки; только пока виден оверлей. */
+.overlay::before {
+  content: '';
+  position: absolute;
+  inset: -25%;
+  pointer-events: none;
+  animation: drift 40s ease-in-out infinite alternate;
+}
+.overlay > * {
+  position: relative;
+}
+.overlay.bg-gradient1::before {
+  background:
+    radial-gradient(ellipse at 30% 25%, rgba(120, 200, 180, 0.26), transparent 55%),
+    radial-gradient(ellipse at 72% 78%, rgba(170, 140, 230, 0.24), transparent 55%);
+}
+.overlay.bg-gradient2::before {
+  background:
+    radial-gradient(ellipse at 25% 70%, rgba(90, 170, 230, 0.28), transparent 55%),
+    radial-gradient(ellipse at 75% 30%, rgba(110, 220, 210, 0.22), transparent 55%);
+}
+.overlay.bg-gradient3::before {
+  background:
+    radial-gradient(ellipse at 30% 30%, rgba(255, 190, 150, 0.26), transparent 55%),
+    radial-gradient(ellipse at 70% 75%, rgba(255, 160, 190, 0.22), transparent 55%);
+}
+@keyframes drift {
+  from {
+    transform: translate(-4%, -3%) rotate(0deg);
+  }
+  to {
+    transform: translate(4%, 3%) rotate(8deg);
+  }
 }

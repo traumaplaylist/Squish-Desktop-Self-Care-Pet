@@ -10,6 +10,16 @@ import type {
 } from '../../core/types';
 import { useI18n } from '../shared/useI18n';
 
+/** Debug-кнопки Недели 2 (тексты Debug-окна — служебные, без i18n, как и остальные). */
+const WEEK2 = [
+  ['adventure', '🎒 в приключение'],
+  ['return', '🏠 вернуться'],
+  ['egg', '🥚 яйцо'],
+  ['hatch', '🐣 вылупить'],
+  ['evening', '🌙 вечерний вопрос'],
+  ['trait', '✨ черта'],
+] as const;
+
 const VISUALS: PetVisualState[] = [
   'idle',
   'happy',
@@ -190,11 +200,21 @@ export function Debug() {
             <button
               key={o ?? 'none'}
               className={
-                (snap?.pet.accessories[0] ?? null) === (o ? `outfit:${o}` : null) ? 'on' : ''
+                (o === 'wizard') === !!snap?.pet.accessories.includes('head:wizard') ? 'on' : ''
               }
               onClick={() => window.squish.send('debug:outfit', o)}
             >
               {t(o ? `outfit.${o}` : 'outfit.none')}
+            </button>
+          ))}
+        </div>
+      </section>
+      <section>
+        <h2>{t('debug.week2')}</h2>
+        <div className="row">
+          {WEEK2.map(([c, label]) => (
+            <button key={c} onClick={() => window.squish.send('debug:week2', c)}>
+              {label}
             </button>
           ))}
         </div>

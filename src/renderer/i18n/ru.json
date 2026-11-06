@@ -435,7 +435,7 @@
   "adv.place.30": "Дошёл до мельницы.",
   "adv.event.30": "Нашёл эхо и долго с ним болтал.",
   "adv.find.30": "Нашёл свою улыбку — она всегда со мной.",
-  "trait.favoriteFood": "Любимая еда — {food}",
+  "trait.favoriteFood": "Любимая еда: {food}",
   "trait.favoriteFood.line": "Знаешь, что самое вкусное? Ты уже знаешь 😋",
   "trait.morningPerson": "Любит утро",
   "trait.morningPerson.line": "Утро пахнет новыми делами.",
@@ -522,9 +522,9 @@
   "task.reminder": "Пора: {title}",
   "task.reminderDone": "Сделано",
   "task.reminderLater": "Позже",
-  "treat.yum": "Ням! Спасибо за {food}",
-  "treat.favorite": "Это же моё любимое — {food}!",
-  "treat.favoriteAgain": "Моё любимое! {food}!",
+  "treat.yum": "Ням! Вкусно: {food}",
+  "treat.favorite": "Моё любимое: {food}! Теперь ты знаешь",
+  "treat.favoriteAgain": "Моё любимое: {food}!",
   "streak.restored": "Серия вернулась: {n} дн.",
   "streak.restoreHint": "Серия прервалась. Её можно вернуть до {until}: набери {goal} энергии за день. Не обязательно.",
   "journey.milestone": "Путь: {n} раз! Награда в дневнике",
@@ -570,5 +570,9 @@
   "home.treats": "Угощения",
   "home.shopHint": "Постоянный ассортимент — ничего не исчезает",
   "settings.minimalWidget": "Минималистичный виджет (без островка)",
-  "debug.week2": "Неделя 2"
+  "debug.week2": "Неделя 2",
+  "settings.background": "Фон перерыва",
+  "settings.bg.gradient1": "Сумерки",
+  "settings.bg.gradient2": "Море",
+  "settings.bg.gradient3": "Рассвет"
 }

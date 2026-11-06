@@ -522,9 +522,9 @@
   "task.reminder": "It's time: {title}",
   "task.reminderDone": "Done",
   "task.reminderLater": "Later",
-  "treat.yum": "Yum! Thanks for the {food}",
-  "treat.favorite": "That's my favorite — {food}!",
-  "treat.favoriteAgain": "My favorite! {food}!",
+  "treat.yum": "Yum! Tasty: {food}",
+  "treat.favorite": "My favorite: {food}! Now you know",
+  "treat.favoriteAgain": "My favorite: {food}!",
   "streak.restored": "Streak is back: {n} days",
   "streak.restoreHint": "Your streak broke. You can bring it back by {until}: earn {goal} energy in a day. Totally optional.",
   "journey.milestone": "Path: {n} times! Reward is in the diary",
@@ -570,5 +570,9 @@
   "home.treats": "Treats",
   "home.shopHint": "Permanent selection — nothing ever leaves",
   "settings.minimalWidget": "Minimal widget (no island)",
-  "debug.week2": "Week 2"
+  "debug.week2": "Week 2",
+  "settings.background": "Break background",
+  "settings.bg.gradient1": "Dusk",
+  "settings.bg.gradient2": "Sea",
+  "settings.bg.gradient3": "Dawn"
 }

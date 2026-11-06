@@ -378,6 +378,8 @@ export interface HomeStats {
     streakFreezes: number;
     coins: number;
     traits: TraitId[];
+    /** Любимое угощение — только если черта уже раскрыта. */
+    favoriteFood: string | null;
     microPets: { id: MicroPetId; shown: boolean }[];
     eggs: { daysLeft: number }[];
     owned: AccessoryId[];
@@ -427,6 +429,8 @@ export interface Snapshot {
   sounds: { enabled: boolean; volume: number };
   scheduler: import('./scheduler').SchedulerView;
   overlayOpacity: number;
+  /** Фон оверлея (SPEC 2.2, P1): 3 спокойных анимированных градиента. */
+  overlayBackground: 'gradient1' | 'gradient2' | 'gradient3';
   /** Реплика питомца в облачке (не связанная с перерывом). */
   bubble: Bubble | null;
   water: { glasses: number; goal: number };

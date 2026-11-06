@@ -79,7 +79,10 @@ export function Overlay({ primary }: { primary: boolean }) {
   );
 
   return (
-    <div className={`overlay ${phase}`} style={{ ['--dim' as string]: String(opacity) }}>
+    <div
+      className={`overlay ${phase} bg-${snap?.overlayBackground ?? 'gradient1'}`}
+      style={{ ['--dim' as string]: String(opacity) }}
+    >
       {primary ? (
         <div className="stage">
           <div className="big-pet" ref={hostRef} />

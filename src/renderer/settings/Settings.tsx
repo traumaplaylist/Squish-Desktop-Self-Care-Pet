@@ -94,6 +94,16 @@ export function SettingsPage() {
             onChange={(v) => set({ breaks: { strictness: v } })}
           />
         </Field>
+        <Field label={t('settings.background')}>
+          <Seg
+            value={s.breaks.background}
+            options={(['gradient1', 'gradient2', 'gradient3'] as const).map((k) => [
+              k,
+              t(`settings.bg.${k}`),
+            ])}
+            onChange={(v) => set({ breaks: { background: v } })}
+          />
+        </Field>
         <Field label={t('settings.opacity')}>
           <input
             type="range"
@@ -330,6 +340,11 @@ export function SettingsPage() {
           label={t('settings.autostart')}
           value={s.general.autostart}
           onChange={(v) => set({ general: { autostart: v } })}
+        />
+        <Toggle
+          label={t('settings.minimalWidget')}
+          value={s.general.minimalWidget}
+          onChange={(v) => set({ general: { minimalWidget: v } })}
         />
         <Toggle
           label={t('settings.hideFromCapture')}

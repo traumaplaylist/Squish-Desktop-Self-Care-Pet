@@ -46,10 +46,7 @@ try {
   await dbg.getByRole('button', { name: 'Хомяк-булочка' }).click();
   await widget.locator('.pet.species-hamster.species-hamster').waitFor({ timeout: 5000 });
   check(true, 'Debug → «Хомяк-булочка»: виджет перерисован хомяком');
-  check(
-    (await widget.locator('.pet.species-hamster .arm').count()) === 2,
-    'лапки на месте',
-  );
+  check((await widget.locator('.pet.species-hamster .arm').count()) === 2, 'лапки на месте');
   await wait(1200);
   await widget.screenshot({ path: join(out, '01-idle.png') });
 

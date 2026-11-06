@@ -219,3 +219,53 @@ body,
     transform: translate(130px, 30px) scale(0.5);
   }
 }
+
+/* ── Неделя 2: островок, микро-питомцы, приключение ── */
+.island {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pet-host.away {
+  /* «ушёл»: питомец меньше и бледнее, записка — в облачке */
+  transform: scale(0.82) translate(18px, 10px);
+}
+.micro-pets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.micro-slot {
+  position: absolute;
+  top: 262px;
+}
+.micro-slot.slot-0 {
+  right: 18px;
+}
+.micro-slot.slot-1 {
+  right: 50px;
+  top: 280px;
+}
+.micro-pets[data-hop='1'] .micro-slot {
+  animation: micro-hop 600ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+.micro-pets[data-hop='1'] .slot-1 {
+  animation-delay: 120ms;
+}
+@keyframes micro-hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-14px);
+  }
+}
+.bubble.story .story-text {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #5d5678;
+}
+.bubble.note {
+  background: #fff6e0;
+}

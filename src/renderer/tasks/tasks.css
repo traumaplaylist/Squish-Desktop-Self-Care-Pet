@@ -389,3 +389,43 @@ h1 {
 :root[data-theme='dark'] .first-aid {
   background: var(--warm);
 }
+
+/* Пути (SPEC 5.5): тонкая полоска прогресса. */
+.journeys {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 6px;
+}
+.journey {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.journey .j-bar {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(46, 42, 61, 0.1);
+  overflow: hidden;
+}
+.journey .j-bar i {
+  display: block;
+  height: 100%;
+  background: #9ee6cf;
+}
+.journey .j-meta {
+  opacity: 0.7;
+}
+.journeys-new {
+  font-size: 12px;
+  margin: 2px 0 6px;
+}
+.journeys-new summary {
+  cursor: pointer;
+  opacity: 0.85;
+}
+.journeys-new .chips {
+  margin-top: 6px;
+}

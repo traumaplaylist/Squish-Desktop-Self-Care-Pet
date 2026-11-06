@@ -176,6 +176,24 @@ export function Tasks() {
             </button>
           </>
         )}
+        {mode === 'panel' && view && view.journeys.available.length > 0 && (
+          <details className="journeys-new">
+            <summary>
+              🧭 {t('journey.title')} · <span className="muted">{t('journey.hint')}</span>
+            </summary>
+            <div className="chips">
+              {view.journeys.available.map((id) => (
+                <button
+                  key={id}
+                  className="chip"
+                  onClick={() => window.squish.send('journey:start', id)}
+                >
+                  + {t(`journey.${id}`)}
+                </button>
+              ))}
+            </div>
+          </details>
+        )}
         {mode === 'panel' && view?.firstAid && (
           <div className="first-aid">
             <div className="fa-title">🩹 {t('firstAid.title')}</div>
@@ -197,6 +215,30 @@ export function Tasks() {
                 </button>
               ))}
             </div>
+          </div>
+        )}
+        {mode === 'panel' && view && view.journeys.active.length > 0 && (
+          <div className="journeys">
+            {view.journeys.active.map((j) => (
+              <div className="journey" key={j.id} title={t('journey.hint')}>
+                <span className="j-title">🧭 {t(j.titleKey)}</span>
+                <span className="j-bar">
+                  <i
+                    style={{
+                      width: `${Math.min(100, (100 * j.completions) / ((j.next ?? j.completions) || 1))}%`,
+                    }}
+                  />
+                </span>
+                <span className="j-meta">
+                  {j.next
+                    ? t('journey.progress', { n: j.completions, next: j.next })
+                    : t('journey.done', { n: j.completions })}
+                </span>
+                <button className="link" onClick={() => window.squish.send('journey:stop', j.id)}>
+                  {t('journey.stop')}
+                </button>
+              </div>
+            ))}
           </div>
         )}
         {mode === 'panel' && (

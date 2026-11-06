@@ -53,8 +53,10 @@ jobs:
         run: node scripts/e2e-pet.mjs
       - name: E2E onboarding, settings (live), pet's home
         run: node scripts/e2e-onboarding.mjs
-      - name: E2E species (hamster from parts)
+      - name: E2E species (vector hamster)
         run: node scripts/e2e-species.mjs
+      - name: E2E week 2 (shop, wardrobe, treats, adventure, micro-pets, evening, paths)
+        run: node scripts/e2e-week2.mjs
       - name: Idle CPU / RAM on Windows (packaged app)
         run: node scripts/measure-idle.mjs
         env:

@@ -143,7 +143,7 @@ function Blob(p: BlobProps) {
                 </radialGradient>
               </defs>
               <g data-hit>
-                {base === 'adventure' && <Backpack x={160} y={110} />}
+                {base === 'adventure' && <Backpack x={172} y={116} />}
                 {A('back')}
                 <ellipse cx={76} cy={176} rx={14} ry={8} fill={c.bodyDark} />
                 <ellipse cx={124} cy={176} rx={14} ry={8} fill={c.bodyDark} />

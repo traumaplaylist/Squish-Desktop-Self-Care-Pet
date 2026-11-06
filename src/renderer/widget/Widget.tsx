@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Snapshot } from '../../core/types';
 import { applyLook, usePetRenderer } from '../pet/usePetRenderer';
+import { MicroPet } from '../pet/micro';
 import { useI18n } from '../shared/useI18n';
+import { Island } from './Island';
 
 const DRAG_THRESHOLD_PX = 4;
 
@@ -11,6 +13,7 @@ export function Widget() {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [hover, setHover] = useState(false);
   const [flights, setFlights] = useState<{ id: number; n: number; surprise: boolean }[]>([]);
+  const [microHop, setMicroHop] = useState(0);
   const t = useI18n();
   const snapRef = useRef<Snapshot | null>(null);
 
@@ -49,6 +52,7 @@ export function Widget() {
         // Монетки влетают слева (со стороны окна задач) и падают в питомца.
         const f = { id: Date.now() + Math.random(), n: Math.min(8, Math.max(1, count)), surprise };
         setFlights((l) => [...l, f]);
+        setMicroHop((n) => n + 1); // микро-питомцы радуются галочке (SPEC 4.8)
         window.setTimeout(() => setFlights((l) => l.filter((x) => x.id !== f.id)), 1400);
       }),
     ];
@@ -176,15 +180,25 @@ export function Widget() {
 
   return (
     <div className="widget" onContextMenu={onContextMenu}>
+      {snap && <Island snap={snap} />}
       <div
         ref={hostRef}
-        className={`pet-host${dragging ? ' dragging' : ''}`}
+        className={`pet-host${dragging ? ' dragging' : ''}${snap?.pet.adventure ? ' away' : ''}`}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
         onDoubleClick={onDoubleClick}
       />
+      {snap && snap.pet.microPets.length > 0 && (
+        <div className="micro-pets" key={microHop} data-hop={microHop > 0 ? '1' : '0'}>
+          {snap.pet.microPets.map((id, i) => (
+            <span key={`${id}-${i}`} className={`micro-slot slot-${i}`}>
+              <MicroPet id={id} />
+            </span>
+          ))}
+        </div>
+      )}
       {snap && <Bubble snap={snap} t={t} />}
       <HoverButtons visible={hover && !dragging} t={t} />
       {flights.map((f) => (
@@ -238,8 +252,11 @@ function Bubble({ snap, t }: { snap: Snapshot; t: T }) {
   if (snap.bubble) {
     const b = snap.bubble;
     return (
-      <div className="bubble" data-hit>
+      <div className={`bubble${b.parts?.length ? ' story' : ''}`} data-hit>
         <div>{t(b.textKey, b.params)}</div>
+        {b.parts?.length ? (
+          <div className="story-text">{b.parts.map((k) => t(k)).join(' ')}</div>
+        ) : null}
         {b.actions?.length ? (
           <div className="actions">
             {b.actions.map((a, i) => (
@@ -253,6 +270,17 @@ function Bubble({ snap, t }: { snap: Snapshot; t: T }) {
             ))}
           </div>
         ) : null}
+      </div>
+    );
+  }
+  // Ушёл в приключение (SPEC 4.4): записка вместо облачка.
+  if (snap.pet.adventure) {
+    const d = new Date(snap.pet.adventure.returnsAt);
+    const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return (
+      <div className="bubble note" data-hit>
+        <span aria-hidden>🎒 </span>
+        {t('adv.away', { time })}
       </div>
     );
   }

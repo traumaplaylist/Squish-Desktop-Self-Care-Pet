@@ -829,6 +829,9 @@ export class Engine {
         streakFreezes: st.pet.streakFreezes,
         coins: st.economy.coins,
         traits: st.pet.revealedTraits,
+        favoriteFood: st.pet.revealedTraits.includes('favoriteFood')
+          ? favoriteFood(st.pet, TREAT_IDS)
+          : null,
         microPets: st.pet.microPets.map((m) => ({ id: m.id, shown: m.shown })),
         eggs: st.pet.eggs.map((e) => ({
           daysLeft: Math.max(0, 3 - (st.pet.careDays - e.careDaysAtReceive)),
@@ -1102,7 +1105,8 @@ export class Engine {
       } else textKey = 'treat.favoriteAgain';
     }
     this.d.setState({ ...st, pet }, 0);
-    this.setBubble({ textKey, params: { food: `treat.${treatId}` } }, 5000);
+    const tr = this.d.t ?? ((k: string) => k);
+    this.setBubble({ textKey, params: { food: tr(`treat.${treatId}`) } }, 5000);
     this.d.onEffects([{ type: 'petReaction', reaction: 'eat' }]);
   }
 
@@ -1301,6 +1305,7 @@ export class Engine {
       sounds: { enabled: settings.pet.sounds, volume: settings.pet.volume },
       scheduler: view,
       overlayOpacity: settings.breaks.overlayOpacity,
+      overlayBackground: settings.breaks.background,
       bubble: this.bubble ? (({ untilReal: _u, ...b }) => b)(this.bubble) : null,
       water: {
         glasses: waterForDay(st.water, dayKey(now)).glasses,

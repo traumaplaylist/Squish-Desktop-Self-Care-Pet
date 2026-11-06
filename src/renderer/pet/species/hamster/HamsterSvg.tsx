@@ -323,7 +323,7 @@ export function Hamster(p: PetViewProps) {
                 </radialGradient>
               </defs>
               {outfit.back}
-              {base === 'adventure' && <Backpack x={164} y={112} />}
+              {base === 'adventure' && <Backpack x={174} y={118} />}
               {A('back')}
               <g data-hit>
                 {/* ноги */}
